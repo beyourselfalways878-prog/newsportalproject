@@ -250,14 +250,14 @@ const ArticleUploaderPage = () => {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="admin-page flex justify-center items-center min-h-screen bg-white dark:bg-gray-900">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="admin-page min-h-screen bg-white dark:bg-gray-900">
       <Helmet>
         <title>{articleId ? 'Edit Article' : 'New Article'} | 24x7 Indian News</title>
       </Helmet>
