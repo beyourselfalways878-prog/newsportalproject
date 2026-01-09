@@ -89,7 +89,7 @@ export const contentData = {
     }
   },
   hi: {
-    siteName: '24x7 Indian News',
+    siteName: '24x7 इंडियन न्यूज',
     tagline: 'भारत और दुनिया की 24x7 ख़बरों का आपका विश्वसनीय स्रोत',
     categories: {
       all: 'सभी समाचार',
