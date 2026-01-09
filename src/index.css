@@ -54,6 +54,7 @@
 /* Smooth page transitions */
 * {
   scroll-behavior: smooth;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -62,6 +63,33 @@ body {
   font-feature-settings: "rlig" 1, "calt" 1;
   transition: background-color 0.3s ease, color 0.3s ease;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Mobile-first base font size */
+  font-size: 14px;
+}
+
+/* Responsive typography */
+@media (min-width: 640px) {
+  body { font-size: 15px; }
+}
+@media (min-width: 768px) {
+  body { font-size: 16px; }
+}
+@media (min-width: 1024px) {
+  body { font-size: 16px; }
+}
+
+/* Touch-friendly tap targets for mobile */
+@media (max-width: 767px) {
+  button, a, input, select, textarea {
+    min-height: 44px;
+  }
+  
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
 }
 
 .font-sans {
@@ -407,12 +435,23 @@ input[type="email"]:focus, input[type="text"]:focus, textarea:focus {
   -webkit-backdrop-filter: blur(8px);
 }
 
-.news-card:hover {
-  transform: translateY(-4px);
-  box-shadow:
-    0 20px 40px hsl(var(--shadow-color) / 0.15),
-    0 0 0 1px hsl(var(--primary) / 0.1);
-  border-color: hsl(var(--primary) / 0.3);
+/* Disable hover effects on touch devices for better performance */
+@media (hover: hover) and (pointer: fine) {
+  .news-card:hover {
+    transform: translateY(-4px);
+    box-shadow:
+      0 20px 40px hsl(var(--shadow-color) / 0.15),
+      0 0 0 1px hsl(var(--primary) / 0.1);
+    border-color: hsl(var(--primary) / 0.3);
+  }
+}
+
+/* Touch device active states */
+@media (hover: none) {
+  .news-card:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+  }
 }
 
 /* Focus ring enhancement */
@@ -431,4 +470,31 @@ input[type="email"]:focus, input[type="text"]:focus, textarea:focus {
 ::-moz-selection {
   background: hsl(var(--primary) / 0.3);
   color: hsl(var(--foreground));
+}
+
+/* Mobile-first utility classes */
+.safe-area-inset {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Image optimization */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Lazy loading placeholder */
+img[loading="lazy"] {
+  background: linear-gradient(135deg, hsl(var(--muted)) 0%, hsl(var(--muted) / 0.5) 100%);
 }

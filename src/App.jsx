@@ -9,6 +9,7 @@ const HomePage = lazy(() => import('@/pages/HomePage.jsx'));
 const CategoryPage = lazy(() => import('@/pages/CategoryPage.jsx'));
 const ArticlePage = lazy(() => import('@/pages/ArticlePage.jsx'));
 const DashboardPage = lazy(() => import('@/pages/DashboardPage.jsx'));
+const ArticleUploaderPage = lazy(() => import('@/pages/ArticleUploaderPage.jsx'));
 
 const PageFallback = () => (
   <div className="flex justify-center items-center min-h-[60vh]">
@@ -31,6 +32,14 @@ const App = () => {
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'super-admin']}>
                     <DashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/article-uploader"
+                element={
+                  <ProtectedRoute allowedRoles={['admin', 'super-admin']}>
+                    <ArticleUploaderPage />
                   </ProtectedRoute>
                 }
               />
