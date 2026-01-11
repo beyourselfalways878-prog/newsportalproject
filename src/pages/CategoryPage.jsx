@@ -27,12 +27,23 @@ const CategoryPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isUploaderOpen, setIsUploaderOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
   const baseUrl = window.location.origin;
 
+  const PAGE_SIZE = 24;
+
   const fetchNews = useCallback(async () => {
     setIsLoading(true);
-    let query = supabase.from('articles').select('*').order('published_at', { ascending: false });
+    const from = 0;
+    const to = PAGE_SIZE - 1;
+
+    let query = supabase
+      .from('articles')
+      .select('id,title_hi,excerpt_hi,content_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,views,time_ago,seo_title_hi,seo_keywords_hi,video_url')
+      .order('published_at', { ascending: false })
+      .range(from, to);
     if (categoryKey) {
       query = query.eq('category', categoryKey);
     }
@@ -49,9 +60,38 @@ const CategoryPage = () => {
       setArticles([]);
     } else {
       setArticles(data);
+      setPage(1);
+      setHasMore((data?.length || 0) === PAGE_SIZE);
     }
     setIsLoading(false);
   }, [categoryKey]);
+
+  const fetchMoreNews = useCallback(async () => {
+    if (isLoading || !hasMore) return;
+    const nextPage = page + 1;
+    const from = (nextPage - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    let query = supabase
+      .from('articles')
+      .select('id,title_hi,excerpt_hi,content_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,views,time_ago,seo_title_hi,seo_keywords_hi,video_url')
+      .order('published_at', { ascending: false })
+      .range(from, to);
+    if (categoryKey) {
+      query = query.eq('category', categoryKey);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error fetching more articles:', error);
+      setHasMore(false);
+      return;
+    }
+
+    setArticles((prev) => [...prev, ...(data || [])]);
+    setPage(nextPage);
+    setHasMore((data?.length || 0) === PAGE_SIZE);
+  }, [categoryKey, hasMore, isLoading, page]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'light';
@@ -188,6 +228,10 @@ const CategoryPage = () => {
         <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={pageDescription} />
         <meta property="og:url" content={canonicalUrl} />
+        <meta property="og:type" content="website" />
+        <meta property="og:image" content={`${baseUrl}/logo-social.png`} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:image" content={`${baseUrl}/logo-social.png`} />
       </Helmet>
 
       <Header currentContent={currentContent} language={language} darkMode={darkMode} toggleDarkMode={toggleDarkMode} onLogoClick={handleBackToHome} onLoginClick={handleLoginClick} />
@@ -201,6 +245,14 @@ const CategoryPage = () => {
                 {renderContent()}
               </motion.div>
             </AnimatePresence>
+
+            {!isLoading && hasMore && (
+              <div className="flex justify-center mt-6">
+                <Button onClick={fetchMoreNews} variant="outline" className="w-full sm:w-auto">
+                  और खबरें देखें
+                </Button>
+              </div>
+            )}
           </main>
           <Sidebar currentContent={currentContent} language={language} selectedCategory={categoryKey} onSelectCategory={handleCategorySelect} trendingTopics={trendingDbTopics} email={email} setEmail={setEmail} handleSubscribe={handleSubscribe} />
         </div>
@@ -211,11 +263,11 @@ const CategoryPage = () => {
       <AuthModal isOpen={isAuthModalOpen} setIsOpen={setIsAuthModalOpen} />
 
       {canUpload && (
-        <div className="fixed bottom-8 right-8 z-50">
+        <div className="fixed bottom-4 right-4 sm:bottom-8 sm:right-8 z-50 pb-[env(safe-area-inset-bottom)]">
           <motion.div
             initial={{ scale: 0, y: 50 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}>
-            <Button onClick={handleUploadClick} size="lg" className="rounded-full shadow-2xl btn-gradient w-16 h-16" aria-label="Upload Content">
-              <Plus className="h-8 w-8" />
+            <Button onClick={handleUploadClick} size="lg" className="rounded-full shadow-2xl btn-gradient w-14 h-14 sm:w-16 sm:h-16 touch-manipulation" aria-label="Upload Content">
+              <Plus className="h-6 w-6 sm:h-8 sm:w-8" />
             </Button>
           </motion.div>
         </div>

@@ -30,15 +30,23 @@ const HomePage = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isUploaderOpen, setIsUploaderOpen] = useState(false);
   const [activeLegalPage, setActiveLegalPage] = useState(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
   const baseUrl = window.location.origin;
 
+  const PAGE_SIZE = 24;
+
   const fetchNews = useCallback(async () => {
     setIsLoading(true);
+    const from = 0;
+    const to = PAGE_SIZE - 1;
+
     const { data, error } = await supabase
       .from('articles')
-      .select('*')
-      .order('published_at', { ascending: false });
+      .select('id,title_hi,excerpt_hi,content_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,views,time_ago,seo_title_hi,seo_keywords_hi,video_url')
+      .order('published_at', { ascending: false })
+      .range(from, to);
 
     if (error) {
       console.error('Error fetching articles:', error);
@@ -50,9 +58,34 @@ const HomePage = () => {
       setArticles([]);
     } else {
       setArticles(data);
+      setPage(1);
+      setHasMore((data?.length || 0) === PAGE_SIZE);
     }
     setIsLoading(false);
   }, []);
+
+  const fetchMoreNews = useCallback(async () => {
+    if (isLoading || !hasMore) return;
+    const nextPage = page + 1;
+    const from = (nextPage - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    const { data, error } = await supabase
+      .from('articles')
+      .select('id,title_hi,excerpt_hi,content_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,views,time_ago,seo_title_hi,seo_keywords_hi,video_url')
+      .order('published_at', { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      console.error('Error fetching more articles:', error);
+      setHasMore(false);
+      return;
+    }
+
+    setArticles((prev) => [...prev, ...(data || [])]);
+    setPage(nextPage);
+    setHasMore((data?.length || 0) === PAGE_SIZE);
+  }, [hasMore, isLoading, page]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'light';
@@ -182,7 +215,16 @@ const HomePage = () => {
     return (
       <div className="space-y-12">
         <FeaturedArticleHero article={featuredArticle} content={currentContent} onReadMore={() => handleArticleSelect(featuredArticle)} />
-        <ArticleGrid articles={otherArticles} content={currentContent} onArticleClick={handleArticleSelect} />
+        <div className="space-y-6">
+          <ArticleGrid articles={otherArticles} content={currentContent} onArticleClick={handleArticleSelect} />
+          {!activeLegalPage && !isLoading && hasMore && (
+            <div className="flex justify-center">
+              <Button onClick={fetchMoreNews} variant="outline" className="w-full sm:w-auto">
+                और खबरें देखें
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -203,6 +245,10 @@ const HomePage = () => {
         <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={pageDescription} />
         <meta property="og:url" content={baseUrl} />
+        <meta property="og:type" content="website" />
+        <meta property="og:image" content={`${baseUrl}/logo-social.png`} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:image" content={`${baseUrl}/logo-social.png`} />
       </Helmet>
 
       <Header currentContent={currentContent} language={language} darkMode={darkMode} toggleDarkMode={toggleDarkMode} onLogoClick={handleBackToHome} onLoginClick={handleLoginClick} />
