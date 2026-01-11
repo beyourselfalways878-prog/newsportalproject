@@ -33,6 +33,16 @@ export default async function handler(req, res) {
       'opinion',
       'video',
       'auto',
+      'recipes',
+      'beauty',
+      'lifestyle',
+      'jobs-education',
+      'personal-finance',
+      'astrology-spiritual',
+      'agriculture',
+      'crime-law',
+      'weather',
+      'fact-check',
     ];
 
     const staticUrls = [
