@@ -20,7 +20,7 @@ const Sidebar = ({
       initial={{ opacity: 0, x: 50 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.5, delay: 0.2 }}
-      className="lg:col-span-4 space-y-8 sticky top-24"
+      className="hidden lg:block lg:col-span-4 space-y-8 sticky top-24 self-start"
     >
       <CategoryMenu
         categories={Object.entries(currentContent.categories)}

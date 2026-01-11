@@ -237,121 +237,119 @@ const ArticleUploader = ({ isOpen, setIsOpen, onUploadSuccess, currentContent, c
       setIsOpen(open);
       if (!open) resetForm();
     }}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="w-full sm:max-w-2xl md:max-w-4xl max-h-[85dvh] sm:max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>{formTitle}</DialogTitle>
-          <DialogDescription>{currentContent.uploader.description}</DialogDescription>
+          <DialogDescription className="hidden sm:block">{currentContent.uploader.description}</DialogDescription>
         </DialogHeader>
 
-        <div className="flex-grow overflow-y-auto p-1 space-y-6">
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="flex-1 overflow-y-auto -mx-4 px-4 sm:-mx-6 sm:px-6 space-y-4 sm:space-y-6 overscroll-contain touch-pan-y">
+           <div className="grid grid-cols-1 gap-4 sm:gap-5">
             <div>
-              <Label htmlFor="title_hi">शीर्षक (Title)</Label>
-              <Input id="title_hi" value={articleData.title_hi || ''} onChange={handleInputChange} required />
-            </div>
-            <div>
-              <Label htmlFor="excerpt_hi">अंश (Excerpt)</Label>
-              <Textarea id="excerpt_hi" value={articleData.excerpt_hi || ''} onChange={handleInputChange} />
+              <Label htmlFor="title_hi" className="text-sm font-medium">शीर्षक (Title) *</Label>
+              <Input id="title_hi" value={articleData.title_hi || ''} onChange={handleInputChange} required className="mt-1.5" />
             </div>
             <div>
-              <Label htmlFor="category">श्रेणी (Category)</Label>
-              <Select onValueChange={handleCategoryChange} value={articleData.category || 'indian'}>
-                <SelectTrigger id="category">
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map(([key, value]) => (
-                    <SelectItem key={key} value={key}>{value}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="excerpt_hi" className="text-sm font-medium">अंश (Excerpt)</Label>
+              <Textarea id="excerpt_hi" value={articleData.excerpt_hi || ''} onChange={handleInputChange} className="mt-1.5 min-h-[70px]" />
             </div>
-             <div>
-              <Label htmlFor="author">लेखक (Author)</Label>
-              <Input id="author" value={articleData.author || ''} onChange={handleInputChange} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+              <div>
+                <Label htmlFor="category" className="text-sm font-medium">श्रेणी (Category)</Label>
+                <Select onValueChange={handleCategoryChange} value={articleData.category || 'indian'}>
+                  <SelectTrigger id="category" className="mt-1.5">
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map(([key, value]) => (
+                      <SelectItem key={key} value={key}>{value}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="author" className="text-sm font-medium">लेखक (Author)</Label>
+                <Input id="author" value={articleData.author || ''} onChange={handleInputChange} className="mt-1.5" />
+              </div>
             </div>
-             <div>
-              <Label htmlFor="location">स्थान (Location)</Label>
-              <Input id="location" value={articleData.location || ''} onChange={handleInputChange} />
-            </div>
-            <div className="flex items-center space-x-2 pt-4">
-              <Checkbox id="is_breaking" checked={articleData.is_breaking} onCheckedChange={handleCheckboxChange} />
-              <Label htmlFor="is_breaking" className="flex items-center gap-2 text-base font-medium text-orange-500">
-                <Zap className="h-5 w-5" /> ब्रेकिंग न्यूज़ के रूप में चिह्नित करें
-              </Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+              <div>
+                <Label htmlFor="location" className="text-sm font-medium">स्थान (Location)</Label>
+                <Input id="location" value={articleData.location || ''} onChange={handleInputChange} className="mt-1.5" />
+              </div>
+              <div className="flex items-center space-x-2 pt-2 sm:pt-6">
+                <Checkbox id="is_breaking" checked={articleData.is_breaking} onCheckedChange={handleCheckboxChange} />
+                <Label htmlFor="is_breaking" className="flex items-center gap-2 text-sm font-medium text-orange-500 cursor-pointer">
+                  <Zap className="h-4 w-4" /> ब्रेकिंग न्यूज़
+                </Label>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
             <div>
-              <Label>फीचर्ड इमेज (Featured Image)</Label>
-              <div className="mt-2 flex items-center gap-x-3">
-                <div className="w-24 h-24 bg-muted rounded-lg flex items-center justify-center">
-                  {featuredImageUrl ? <img src={featuredImageUrl} alt="Featured preview" className="w-full h-full object-cover rounded-lg" /> : <ImageIcon className="h-8 w-8 text-muted-foreground" />}
+              <Label className="text-sm font-medium">फीचर्ड इमेज (Featured Image)</Label>
+              <div className="mt-2 flex items-center gap-3">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-muted rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  {featuredImageUrl ? <img src={featuredImageUrl} alt="Featured preview" className="w-full h-full object-cover" /> : <ImageIcon className="h-6 w-6 text-muted-foreground" />}
                 </div>
-                <label htmlFor="featured-image-upload" className="cursor-pointer rounded-md bg-primary text-primary-foreground text-sm font-semibold px-3 py-2 hover:bg-primary/90">
-                  <span>छवि अपलोड करें</span>
+                <label htmlFor="featured-image-upload" className="cursor-pointer rounded-md bg-primary text-primary-foreground text-xs sm:text-sm font-semibold px-3 py-2.5 hover:bg-primary/90 active:scale-95 transition-transform">
+                  <span>छवि अपलोड</span>
                   <input id="featured-image-upload" type="file" className="sr-only" accept="image/*" onChange={handleFeaturedImageChange} />
                 </label>
               </div>
             </div>
             <div>
-              <Label>.docx से आयात करें (Import from .docx)</Label>
-              <label htmlFor="docx-upload" className="mt-2 flex justify-center w-full rounded-lg border-2 border-dashed border-border px-6 py-10 cursor-pointer hover:border-primary transition-colors">
+              <Label className="text-sm font-medium">.docx से आयात करें</Label>
+              <label htmlFor="docx-upload" className="mt-2 flex justify-center w-full rounded-lg border-2 border-dashed border-border px-4 py-6 sm:px-6 sm:py-8 cursor-pointer hover:border-primary active:bg-primary/5 transition-colors">
                 <div className="text-center">
-                  <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-                  <div className="mt-4 flex text-sm leading-6 text-muted-foreground">
-                    <p className="pl-1">अपलोड करने के लिए क्लिक करें या खींचें और छोड़ें</p>
-                  </div>
-                  <p className="text-xs leading-5 text-muted-foreground">DOCX 10MB तक</p>
+                  <FileText className="mx-auto h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
+                  <p className="mt-2 text-xs sm:text-sm text-muted-foreground">अपलोड करने के लिए क्लिक करें</p>
+                  <p className="text-xs text-muted-foreground">DOCX 10MB तक</p>
                 </div>
                 <input id="docx-upload" type="file" className="sr-only" accept=".docx" onChange={handleFileChange} />
               </label>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6">
-            <div>
-              <Label htmlFor="image_alt_text_hi">छवि ऑल्ट टेक्स्ट (Image Alt Text)</Label>
-              <Input id="image_alt_text_hi" value={articleData.image_alt_text_hi || ''} onChange={handleInputChange} placeholder="उदा., प्रधानमंत्री भाषण देते हुए" />
-            </div>
+          <div>
+            <Label htmlFor="image_alt_text_hi" className="text-sm font-medium">छवि ऑल्ट टेक्स्ट (Alt Text)</Label>
+            <Input id="image_alt_text_hi" value={articleData.image_alt_text_hi || ''} onChange={handleInputChange} placeholder="उदा., प्रधानमंत्री भाषण देते हुए" className="mt-1.5" />
           </div>
 
           <div className="space-y-4 border-t pt-4">
-            <h3 className="text-lg font-medium text-foreground">मीडिया और एसईओ (Media & SEO)</h3>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="video_url" className="flex items-center gap-2"><Youtube className="h-5 w-5 text-red-500" /> वीडियो एम्बेड कोड (Video Embed Code)</Label>
-                <Textarea id="video_url" value={articleData.video_url || ''} onChange={handleInputChange} placeholder="यहां वीडियो iframe एम्बेड कोड पेस्ट करें (उदा., YouTube, Vimeo से)" />
-              </div>
+            <h3 className="text-base sm:text-lg font-medium text-foreground">मीडिया और एसईओ (Media & SEO)</h3>
+            <div>
+              <Label htmlFor="video_url" className="flex items-center gap-2 text-sm font-medium"><Youtube className="h-4 w-4 text-red-500" /> वीडियो एम्बेड कोड</Label>
+              <Textarea id="video_url" value={articleData.video_url || ''} onChange={handleInputChange} placeholder="YouTube/Vimeo iframe कोड पेस्ट करें" className="mt-1.5 min-h-[60px]" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
               <div>
-                <Label htmlFor="seo_title_hi">एसईओ शीर्षक (SEO Title)</Label>
-                <Input id="seo_title_hi" value={articleData.seo_title_hi || ''} onChange={handleInputChange} placeholder="एक संक्षिप्त, कीवर्ड-युक्त शीर्षक दर्ज करें" />
+                <Label htmlFor="seo_title_hi" className="text-sm font-medium">एसईओ शीर्षक</Label>
+                <Input id="seo_title_hi" value={articleData.seo_title_hi || ''} onChange={handleInputChange} placeholder="कीवर्ड-युक्त शीर्षक" className="mt-1.5" />
               </div>
               <div>
-                <Label htmlFor="seo_keywords_hi">एसईओ कीवर्ड (SEO Keywords)</Label>
-                <Input id="seo_keywords_hi" value={articleData.seo_keywords_hi || ''} onChange={handleInputChange} placeholder="उदा., राजनीति, चुनाव, भारत" />
+                <Label htmlFor="seo_keywords_hi" className="text-sm font-medium">एसईओ कीवर्ड</Label>
+                <Input id="seo_keywords_hi" value={articleData.seo_keywords_hi || ''} onChange={handleInputChange} placeholder="राजनीति, चुनाव, भारत" className="mt-1.5" />
               </div>
             </div>
           </div>
 
           <div>
-            <Label>लेख सामग्री (HTML पूर्वावलोकन)</Label>
+            <Label className="text-sm font-medium">लेख सामग्री (HTML पूर्वावलोकन)</Label>
             <div
-              className="mt-2 w-full min-h-[200px] rounded-md border p-4 bg-muted/50 prose dark:prose-invert max-w-none"
-              dangerouslySetInnerHTML={{ __html: contentHtml || '<p>.docx आयात के बाद सामग्री यहां दिखाई देगी।</p>' }}
+              className="mt-2 w-full min-h-[100px] sm:min-h-[150px] max-h-[200px] overflow-y-auto rounded-md border p-3 sm:p-4 bg-muted/50 prose prose-sm sm:prose dark:prose-invert max-w-none text-sm"
+              dangerouslySetInnerHTML={{ __html: contentHtml || '<p class="text-muted-foreground">.docx आयात के बाद सामग्री यहां दिखाई देगी।</p>' }}
             />
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setIsOpen(false)} disabled={isProcessing}>
+        <DialogFooter className="flex-shrink-0 gap-2 sm:gap-0">
+          <Button variant="outline" onClick={() => setIsOpen(false)} disabled={isProcessing} className="w-full sm:w-auto">
             {currentContent.uploader.form.cancel || 'Cancel'}
           </Button>
-          <Button onClick={handleSave} disabled={isProcessing || !articleData.title_hi}>
+          <Button onClick={handleSave} disabled={isProcessing || !articleData.title_hi} className="w-full sm:w-auto">
             {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {isProcessing ? (currentContent.uploader.form.saving || 'Saving...') : (currentContent.uploader.form.save || 'Save & Publish Article')}
+            {isProcessing ? 'सहेज रहा है...' : 'प्रकाशित करें'}
           </Button>
         </DialogFooter>
       </DialogContent>

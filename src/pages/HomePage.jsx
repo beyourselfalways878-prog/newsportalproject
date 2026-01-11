@@ -226,11 +226,11 @@ const HomePage = () => {
       <AuthModal isOpen={isAuthModalOpen} setIsOpen={setIsAuthModalOpen} />
 
       {canUpload && (
-        <div className="fixed bottom-8 right-8 z-50">
+        <div className="fixed bottom-4 right-4 sm:bottom-8 sm:right-8 z-50 pb-[env(safe-area-inset-bottom)]">
           <motion.div
             initial={{ scale: 0, y: 50 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}>
-            <Button onClick={handleUploadClick} size="lg" className="rounded-full shadow-2xl btn-gradient w-16 h-16" aria-label="Upload Content">
-              <Plus className="h-8 w-8" />
+            <Button onClick={handleUploadClick} size="lg" className="rounded-full shadow-2xl btn-gradient w-14 h-14 sm:w-16 sm:h-16 touch-manipulation" aria-label="Upload Content">
+              <Plus className="h-6 w-6 sm:h-8 sm:w-8" />
             </Button>
           </motion.div>
         </div>

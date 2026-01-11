@@ -55,6 +55,13 @@
 * {
   scroll-behavior: smooth;
   -webkit-tap-highlight-color: transparent;
+  /* Performance: prevent layout shifts */
+  box-sizing: border-box;
+}
+
+/* Mobile viewport fix for 100vh issues */
+:root {
+  --vh: 1vh;
 }
 
 body {
@@ -67,6 +74,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
   /* Mobile-first base font size */
   font-size: 14px;
+  /* Prevent text size adjustment on orientation change */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Safe area padding for notch devices */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 /* Responsive typography */
@@ -82,14 +95,41 @@ body {
 
 /* Touch-friendly tap targets for mobile */
 @media (max-width: 767px) {
-  button, a, input, select, textarea {
+  button, a, [role="button"] {
     min-height: 44px;
+    min-width: 44px;
+  }
+  
+  input, select, textarea {
+    min-height: 44px;
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
   }
   
   .container {
     padding-left: 1rem;
     padding-right: 1rem;
   }
+
+  /* Reduce heavy animations on mobile for better performance */
+  .news-card {
+    transform: none !important;
+  }
+  
+  /* Optimize backdrop-filter for mobile */
+  .backdrop-blur-lg,
+  .backdrop-blur-md {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+}
+
+/* Touch manipulation for better scrolling */
+.touch-pan-y {
+  touch-action: pan-y;
+}
+
+.touch-manipulation {
+  touch-action: manipulation;
 }
 
 .font-sans {
