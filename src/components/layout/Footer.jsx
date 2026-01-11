@@ -43,7 +43,7 @@ const Footer = ({ currentContent, onNavigate, onSelectCategory }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
 
           <div className="lg:col-span-2">
-            <p className="text-3xl font-extrabold mb-4 text-orange-500">{siteName}</p>
+            <p className="text-3xl font-extrabold mb-4 text-primary">{siteName}</p>
             <p className="text-muted-foreground text-sm leading-relaxed mb-6">
               भारत और दुनिया भर से नवीनतम, विश्वसनीय समाचार और गहन विश्लेषण प्राप्त करें। राजनीति, तकनीक, मनोरंजन और बहुत कुछ — सब एक जगह पर।
             </p>

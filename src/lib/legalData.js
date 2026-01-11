@@ -33,7 +33,7 @@ export const legalData = {
 
         <h3>7. Grievance Officer</h3>
         <p>In accordance with the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021, the name and contact details of the Grievance Officer are provided below:</p>
-        <p><strong>Name:</strong> [Grievance Officer Name]<br><strong>Email:</strong> [grievance-officer@newsindian24x7.com]<br><strong>Address:</strong> [Company Address, India]</p>
+        <p><strong>Name:</strong> Editorial Team<br><strong>Email:</strong> divineink@24x7indiannews.online<br><strong>Address:</strong> Bakshi Ka Talab, Lucknow, India</p>
         <p><em>This policy is a template and should be reviewed by a legal expert.</em></p>
       `
     },
@@ -61,7 +61,7 @@ export const legalData = {
         <p>These Terms and Conditions and your use of the Site are governed by and construed in accordance with the laws of India applicable to agreements made and to be entirely performed within the jurisdiction of the courts located in [City, State], India.</p>
 
         <h3>6. Contact Us</h3>
-        <p>In order to resolve a complaint regarding the Site or to receive further information regarding use of the Site, please contact us at: [contact@newsindian24x7.com]</p>
+        <p>In order to resolve a complaint regarding the Site or to receive further information regarding use of the Site, please contact us at: divineink@24x7indiannews.online</p>
         <p><em>This policy is a template and should be reviewed by a legal expert.</em></p>
       `
     },
@@ -98,7 +98,6 @@ export const legalData = {
         <h4>Contact Information</h4>
         <ul>
           <li><strong>Email:</strong> divineink@24x7indiannews.online</li>
-          <li><strong>Phone:</strong> +91-XXX-XXXXXXX (Available 9 AM - 6 PM IST)</li>
           <li><strong>Address:</strong> Bakshi Ka Talab, Lucknow</li>
         </ul>
         
@@ -150,7 +149,7 @@ export const legalData = {
 
         <h3>7. शिकायत अधिकारी</h3>
         <p>सूचना प्रौद्योगिकी (मध्यस्थ दिशानिर्देश और डिजिटल मीडिया आचार संहिता) नियम, 2021 के अनुसार, शिकायत अधिकारी का नाम और संपर्क विवरण नीचे दिया गया है:</p>
-        <p><strong>नाम:</strong> [शिकायत अधिकारी का नाम]<br><strong>ईमेल:</strong> [grievance-officer@newsindian24x7.com]<br><strong>पता:</strong> [कंपनी का पता, भारत]</p>
+        <p><strong>नाम:</strong> संपादकीय टीम<br><strong>ईमेल:</strong> divineink@24x7indiannews.online<br><strong>पता:</strong> बख्सी का तालाब, लखनऊ, भारत</p>
         <p><em>यह नीति एक टेम्पलेट है और इसकी समीक्षा एक कानूनी विशेषज्ञ द्वारा की जानी चाहिए।</em></p>
       `
     },
@@ -170,7 +169,7 @@ export const legalData = {
         <p>ये नियम और शर्तें और साइट का आपका उपयोग भारत के कानूनों के अनुसार शासित और समझे जाते हैं जो [शहर, राज्य], भारत में स्थित न्यायालयों के अधिकार क्षेत्र में पूरी तरह से किए गए समझौतों पर लागू होते हैं।</p>
 
         <h3>5. हमसे संपर्क करें</h3>
-        <p>साइट के संबंध में किसी शिकायत का समाधान करने या साइट के उपयोग के संबंध में अधिक जानकारी प्राप्त करने के लिए, कृपया हमसे यहां संपर्क करें: [contact@newsindian24x7.com]</p>
+        <p>साइट के संबंध में किसी शिकायत का समाधान करने या साइट के उपयोग के संबंध में अधिक जानकारी प्राप्त करने के लिए, कृपया हमसे यहां संपर्क करें: divineink@24x7indiannews.online</p>
         <p><em>यह नीति एक टेम्पलेट है और इसकी समीक्षा एक कानूनी विशेषज्ञ द्वारा की जानी चाहिए।</em></p>
       `
     },
@@ -207,7 +206,6 @@ export const legalData = {
         <h4>संपर्क जानकारी</h4>
         <ul>
           <li><strong>ईमेल:</strong> divineink@24x7indiannews.online</li>
-          <li><strong>फोन:</strong> +91-XXX-XXXXXXX (सुबह 9 बजे से शाम 6 बजे तक उपलब्ध, IST)</li>
           <li><strong>पता:</strong> बख्सी का तालाब, लखनऊ</li>
         </ul>
         

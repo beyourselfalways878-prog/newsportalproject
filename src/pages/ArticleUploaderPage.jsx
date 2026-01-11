@@ -54,7 +54,7 @@ const ArticleUploaderPage = () => {
         setIsLoading(true);
         const { data, error } = await supabase
           .from('articles')
-          .select('*')
+          .select('id,title_hi,excerpt_hi,content_hi,category,author,location,is_breaking,published_at,image_alt_text_hi,seo_title_hi,seo_keywords_hi,video_url,image_url')
           .eq('id', articleId)
           .single();
         

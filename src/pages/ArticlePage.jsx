@@ -28,7 +28,7 @@ const ArticlePage = () => {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('articles')
-      .select('*')
+      .select('id,title_hi,excerpt_hi,content_hi,category,time_ago,views,author,location,published_at,updated_at,image_url,image_alt_text_hi,seo_title_hi,seo_keywords_hi,video_url')
       .eq('id', id)
       .single();
 

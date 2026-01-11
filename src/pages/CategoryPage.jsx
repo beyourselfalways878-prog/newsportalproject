@@ -105,7 +105,7 @@ const CategoryPage = () => {
   const fetchTrendingTopics = async () => {
     const { data, error } = await supabase
       .from('trending_topics')
-      .select('*')
+      .select('name_en,name_hi,rank')
       .order('rank', { ascending: true });
 
     if (error) {
@@ -229,9 +229,9 @@ const CategoryPage = () => {
         <meta property="og:description" content={pageDescription} />
         <meta property="og:url" content={canonicalUrl} />
         <meta property="og:type" content="website" />
-        <meta property="og:image" content={`${baseUrl}/logo-social.png`} />
+        <meta property="og:image" content={`${baseUrl}/social-card.svg`} />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:image" content={`${baseUrl}/logo-social.png`} />
+        <meta name="twitter:image" content={`${baseUrl}/social-card.svg`} />
       </Helmet>
 
       <Header currentContent={currentContent} language={language} darkMode={darkMode} toggleDarkMode={toggleDarkMode} onLogoClick={handleBackToHome} onLoginClick={handleLoginClick} />

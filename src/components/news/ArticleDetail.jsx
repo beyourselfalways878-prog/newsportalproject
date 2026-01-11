@@ -170,7 +170,7 @@ import React, { useEffect, useState, useRef } from 'react';
           if (!article || !article.category) return;
           const { data, error } = await supabase
             .from('articles')
-            .select('*')
+            .select('id,title_hi,excerpt_hi,image_url,image_alt_text_hi')
             .eq('category', article.category)
             .neq('id', article.id)
             .limit(3);
@@ -225,7 +225,7 @@ import React, { useEffect, useState, useRef } from 'react';
           "name": "24x7 Indian News",
           "logo": {
             "@type": "ImageObject",
-            "url": `${baseUrl}/logo.png`
+            "url": `${baseUrl}/logo.svg`
           }
         },
         "description": excerpt,
