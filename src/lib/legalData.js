@@ -60,7 +60,36 @@ export const legalData = {
         <h3>5. Governing Law</h3>
         <p>These Terms and Conditions and your use of the Site are governed by and construed in accordance with the laws of India applicable to agreements made and to be entirely performed within the jurisdiction of the courts located in [City, State], India.</p>
 
-        <h3>6. Contact Us</h3>
+        <h3>6. Editorial Standards & Corrections</h3>
+        <p>Our goal is to publish accurate, fair, and responsible journalism. The guidelines below are part of how we maintain trust.</p>
+
+        <h4>6.1 Sourcing & Accuracy</h4>
+        <ul>
+          <li>We prioritize primary sources (official documents, court orders, government data, direct statements) and credible on-record reporting.</li>
+          <li>We do not present rumors or unverified social media claims as facts.</li>
+          <li>Headlines, thumbnails, and summaries must reflect the story without exaggeration or misleading framing.</li>
+        </ul>
+
+        <h4>6.2 Crime & Law Reporting (High-Risk)</h4>
+        <ul>
+          <li>We avoid publishing personally identifying details of victims/survivors of sexual violence and minors.</li>
+          <li>We clearly distinguish allegations from proven facts and use neutral language (e.g., “alleged”, “as per FIR/court filings”).</li>
+          <li>We avoid doxxing, vigilantism, and content that could interfere with investigations or proceedings.</li>
+          <li>We include context and, when feasible, the response/position of the accused or relevant authority.</li>
+        </ul>
+
+        <h4>6.3 Fact Check Policy</h4>
+        <ul>
+          <li>We label fact-check articles clearly and quote claims accurately.</li>
+          <li>We link to evidence where possible (official documents, authoritative datasets, direct statements).</li>
+          <li>We explain the verification method (what we checked, how, and what we found) in plain language.</li>
+          <li>We correct or update fact-checks if new evidence emerges and note the change.</li>
+        </ul>
+
+        <h4>6.4 Corrections Policy</h4>
+        <p>If you spot an error, please email us at <a href="mailto:divineink@24x7indiannews.online">divineink@24x7indiannews.online</a> with the article link and the issue. When we correct a significant error, we will update the article and, where appropriate, add a note describing the correction.</p>
+
+        <h3>7. Contact Us</h3>
         <p>In order to resolve a complaint regarding the Site or to receive further information regarding use of the Site, please contact us at: divineink@24x7indiannews.online</p>
         <p><em>This policy is a template and should be reviewed by a legal expert.</em></p>
       `
@@ -168,7 +197,36 @@ export const legalData = {
         <h3>4. शासी कानून</h3>
         <p>ये नियम और शर्तें और साइट का आपका उपयोग भारत के कानूनों के अनुसार शासित और समझे जाते हैं जो [शहर, राज्य], भारत में स्थित न्यायालयों के अधिकार क्षेत्र में पूरी तरह से किए गए समझौतों पर लागू होते हैं।</p>
 
-        <h3>5. हमसे संपर्क करें</h3>
+        <h3>5. संपादकीय मानक व सुधार नीति</h3>
+        <p>हमारा लक्ष्य सटीक, निष्पक्ष और जिम्मेदार पत्रकारिता करना है। भरोसा बनाए रखने के लिए हम नीचे दिए गए मानकों का पालन करते हैं।</p>
+
+        <h4>5.1 स्रोत व सटीकता</h4>
+        <ul>
+          <li>हम प्राथमिक स्रोतों (सरकारी/न्यायालय दस्तावेज, आधिकारिक डेटा, सीधे बयान) और विश्वसनीय ऑन-रिकॉर्ड रिपोर्टिंग को प्राथमिकता देते हैं।</li>
+          <li>हम अफवाहों या अप्रमाणित सोशल मीडिया दावों को तथ्य के रूप में प्रस्तुत नहीं करते।</li>
+          <li>शीर्षक/थंबनेल/सार लेख की वास्तविक सामग्री के अनुरूप होते हैं; अतिरंजना या भ्रामक फ्रेमिंग से बचते हैं।</li>
+        </ul>
+
+        <h4>5.2 अपराध/कानून रिपोर्टिंग (उच्च जोखिम)</h4>
+        <ul>
+          <li>हम यौन हिंसा के पीड़ित/सर्वाइवर और नाबालिगों की पहचान उजागर करने वाली जानकारी प्रकाशित नहीं करते।</li>
+          <li>हम आरोप और सिद्ध तथ्यों में स्पष्ट अंतर रखते हैं (जैसे “आरोपित”, “FIR/अदालती दस्तावेजों के अनुसार”).</li>
+          <li>हम डॉक्सिंग, भीड़-न्याय, और ऐसी सामग्री से बचते हैं जो जांच/कार्यवाही में बाधा बन सकती है।</li>
+          <li>जहां संभव हो, संबंधित पक्ष/प्राधिकरण का पक्ष या प्रतिक्रिया शामिल करते हैं।</li>
+        </ul>
+
+        <h4>5.3 फैक्ट-चेक नीति</h4>
+        <ul>
+          <li>फैक्ट-चेक लेख स्पष्ट रूप से लेबल किए जाते हैं और दावे को सही रूप में उद्धृत किया जाता है।</li>
+          <li>जहां संभव हो, प्रमाण/स्रोत लिंक किए जाते हैं (आधिकारिक दस्तावेज, विश्वसनीय डेटा, सीधे बयान)।</li>
+          <li>हम जांच की विधि सरल भाषा में बताते हैं (क्या जांचा, कैसे, और निष्कर्ष क्या है)।</li>
+          <li>नई जानकारी आने पर हम अपडेट/सुधार करते हैं और बदलाव नोट करते हैं।</li>
+        </ul>
+
+        <h4>5.4 सुधार (Corrections) नीति</h4>
+        <p>यदि आपको कोई त्रुटि दिखे, तो कृपया लेख का लिंक और समस्या के विवरण के साथ हमें ईमेल करें: <a href="mailto:divineink@24x7indiannews.online">divineink@24x7indiannews.online</a>। महत्वपूर्ण त्रुटि सुधारने पर हम लेख अपडेट करेंगे और आवश्यक होने पर सुधार नोट भी जोड़ेंगे।</p>
+
+        <h3>6. हमसे संपर्क करें</h3>
         <p>साइट के संबंध में किसी शिकायत का समाधान करने या साइट के उपयोग के संबंध में अधिक जानकारी प्राप्त करने के लिए, कृपया हमसे यहां संपर्क करें: divineink@24x7indiannews.online</p>
         <p><em>यह नीति एक टेम्पलेट है और इसकी समीक्षा एक कानूनी विशेषज्ञ द्वारा की जानी चाहिए।</em></p>
       `

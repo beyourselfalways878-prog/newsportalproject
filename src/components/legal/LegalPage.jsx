@@ -39,7 +39,7 @@ const LegalPage = ({ page, language, onBack }) => {
           {content.title}
         </h1>
         <p className="text-sm text-muted-foreground mt-2">
-          {language === 'hi' ? 'अंतिम अपडेट: 20 जून 2025' : 'Last Updated: June 20, 2025'}
+          {language === 'hi' ? 'अंतिम अपडेट: 11 जनवरी 2026' : 'Last Updated: January 11, 2026'}
         </p>
       </header>
 
