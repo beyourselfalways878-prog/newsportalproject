@@ -205,6 +205,49 @@ const CategoryPage = () => {
         </div>
       );
     }
+
+    if (!translatedArticles || translatedArticles.length === 0) {
+      const suggestedKeys = Object.keys(currentContent.categories)
+        .filter((k) => k !== 'all' && k !== categoryKey)
+        .slice(0, 8);
+
+      return (
+        <div className="bg-card/70 backdrop-blur-md rounded-xl shadow-xl p-6 sm:p-8 border border-white/10">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground">
+            {categoryName}
+          </h2>
+          <p className="mt-2 text-sm sm:text-base text-muted-foreground">
+            इस श्रेणी में अभी कोई लेख उपलब्ध नहीं है। आप नीचे दी गई श्रेणियां देख सकते हैं — हम जल्द ही यहां भी लेख जोड़ेंगे।
+          </p>
+
+          {suggestedKeys.length > 0 && (
+            <div className="mt-6">
+              <p className="text-sm font-semibold text-foreground mb-3">सुझाई गई श्रेणियां</p>
+              <div className="flex flex-wrap gap-2">
+                {suggestedKeys.map((key) => (
+                  <Button
+                    key={key}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCategorySelect(key)}
+                    className="rounded-full"
+                  >
+                    {currentContent.categories[key]}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-6">
+            <Button variant="default" onClick={() => handleCategorySelect('all')}>
+              होम पर जाएं
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-12">
         <ArticleGrid articles={translatedArticles} content={currentContent} onArticleClick={handleArticleSelect} />
