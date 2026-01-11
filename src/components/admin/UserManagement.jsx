@@ -20,10 +20,10 @@ const UserManagement = ({ currentUserProfile }) => {
     e.preventDefault();
     setIsLoading(true);
 
-    if (currentUserProfile.role !== 'super-admin' && role === 'super-admin') {
+    if (currentUserProfile.role !== 'superuser' && role === 'superuser') {
         toast({
             title: 'Permission Denied',
-            description: 'Only super-admins can create other super-admins.',
+        description: 'Only superusers can create other superusers.',
             variant: 'destructive',
         });
         setIsLoading(false);
@@ -106,8 +106,8 @@ const UserManagement = ({ currentUserProfile }) => {
                 <SelectContent>
                   <SelectItem value="user">User</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
-                  {currentUserProfile.role === 'super-admin' && (
-                    <SelectItem value="super-admin">Super Admin</SelectItem>
+                    {currentUserProfile.role === 'superuser' && (
+                      <SelectItem value="superuser">Superuser</SelectItem>
                   )}
                 </SelectContent>
               </Select>

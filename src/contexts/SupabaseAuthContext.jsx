@@ -12,67 +12,104 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = useCallback(async (userId) => {
+  const normalizeRole = useCallback((role) => {
+    if (!role) return undefined;
+    const lowered = String(role).toLowerCase();
+    if (lowered === 'super-admin') return 'superuser';
+    return lowered;
+  }, []);
+
+  const buildFallbackProfile = useCallback((authUser) => {
+    if (!authUser) return null;
+    const roleFromMetadata = authUser.user_metadata?.role ?? authUser.app_metadata?.role;
+    const fullNameFromMetadata = authUser.user_metadata?.full_name ?? authUser.user_metadata?.name;
+
+    return {
+      id: authUser.id,
+      full_name: fullNameFromMetadata ?? authUser.email,
+      role: normalizeRole(roleFromMetadata) ?? 'user',
+    };
+  }, [normalizeRole]);
+
+  const fetchProfile = useCallback(async (authUser) => {
+    const userId = authUser?.id;
     if (!userId) {
       setProfile(null);
       return;
     }
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    if (error) {
-      console.error('Error fetching profile:', error);
-      setProfile(null);
-    } else {
-      setProfile(data);
+      if (error) {
+        console.error('Error fetching profile:', error);
+        setProfile(buildFallbackProfile(authUser));
+      } else {
+        setProfile({
+          ...data,
+          role: normalizeRole(data?.role) ?? buildFallbackProfile(authUser)?.role ?? 'user',
+        });
+      }
+    } catch (err) {
+      console.error('Profile fetch failed:', err);
+      setProfile(buildFallbackProfile(authUser));
     }
-  }, []);
+  }, [buildFallbackProfile, normalizeRole]);
 
   const handleSession = useCallback(async (session) => {
     setSession(session);
     const currentUser = session?.user ?? null;
     setUser(currentUser);
-    await fetchProfile(currentUser?.id);
+    await fetchProfile(currentUser);
     setLoading(false);
   }, [fetchProfile]);
 
   useEffect(() => {
+    let isMounted = true;
+    
     const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      await handleSession(session);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Error getting session:', error);
+        }
+        if (isMounted) {
+          await handleSession(session);
+        }
+      } catch (err) {
+        console.error('Session fetch failed:', err);
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
     };
 
     getSession();
 
+    // Safety timeout - ensure loading is false after 5 seconds max
+    const timeout = setTimeout(() => {
+      if (isMounted) {
+        setLoading(false);
+      }
+    }, 5000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        await handleSession(session);
+        if (isMounted) {
+          await handleSession(session);
+        }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, [handleSession]);
-
-  const signUp = useCallback(async (email, password, fullName) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-        },
-      },
-    });
-
-    if (error) {
-       console.error("Sign up error:", error);
-    }
-
-    return { data, error };
-  }, []);
 
   const signIn = useCallback(async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -111,10 +148,9 @@ export const AuthProvider = ({ children }) => {
     profile,
     session,
     loading,
-    signUp,
     signIn,
     signOut,
-  }), [user, profile, session, loading, signUp, signIn, signOut]);
+  }), [user, profile, session, loading, signIn, signOut]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

@@ -34,6 +34,13 @@ const ArticleUploader = ({ isOpen, setIsOpen, onUploadSuccess, currentContent, c
 
   const { toast } = useToast();
 
+  const formatSupabaseError = (err) => {
+    if (!err) return 'Unknown error';
+    if (typeof err === 'string') return err;
+    const parts = [err.message, err.details, err.hint, err.code].filter(Boolean);
+    return parts.join(' — ');
+  };
+
   const resetForm = useCallback(() => {
     setArticleData({
       title_hi: '', excerpt_hi: '',
@@ -188,6 +195,13 @@ const ArticleUploader = ({ isOpen, setIsOpen, onUploadSuccess, currentContent, c
   const handleSave = async () => {
     setIsProcessing(true);
 
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session) {
+      toast({ title: 'Login required', description: 'Your session has expired. Please log in again.', variant: 'destructive' });
+      setIsProcessing(false);
+      return;
+    }
+
     let finalImageUrl = articleData.id ? featuredImageUrl : (featuredImageUrl || article?.image_url);
 
     if (featuredImageFile) {
@@ -212,6 +226,7 @@ const ArticleUploader = ({ isOpen, setIsOpen, onUploadSuccess, currentContent, c
         image_url: finalImageUrl,
         published_at: articleData.id ? articleData.published_at : new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        user_id: sessionData.session.user.id, // Add user_id for RLS
       };
 
       delete finalData.created_at;
@@ -224,7 +239,7 @@ const ArticleUploader = ({ isOpen, setIsOpen, onUploadSuccess, currentContent, c
       setIsOpen(false);
     } catch (error) {
       console.error('Error saving article:', error);
-      toast({ variant: 'destructive', title: currentContent.uploader.uploadError, description: error.message });
+      toast({ variant: 'destructive', title: currentContent.uploader.uploadError, description: formatSupabaseError(error) });
     } finally {
       setIsProcessing(false);
     }

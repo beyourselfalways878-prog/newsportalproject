@@ -12,7 +12,7 @@ import { supabase } from '@/lib/customSupabaseClient';
 import { contentData } from '@/lib/data';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
-import { Loader2, FileText, Image as ImageIcon, Zap, Youtube, ArrowLeft, Save, X } from 'lucide-react';
+import { Loader2, FileText, Image as ImageIcon, Zap, Youtube, ArrowLeft, Save, X, Upload, CheckCircle2, Eye, Sparkles } from 'lucide-react';
 
 let mammothPromise;
 const getMammoth = () => {
@@ -22,13 +22,92 @@ const getMammoth = () => {
   return mammothPromise;
 };
 
+// Category detection keywords
+const categoryKeywords = {
+  politics: ['राजनीति', 'चुनाव', 'सरकार', 'मंत्री', 'प्रधानमंत्री', 'संसद', 'विधानसभा', 'नेता', 'पार्टी', 'भाजपा', 'कांग्रेस', 'election', 'government', 'minister', 'parliament'],
+  sports: ['खेल', 'क्रिकेट', 'फुटबॉल', 'हॉकी', 'टेनिस', 'ओलंपिक', 'खिलाड़ी', 'मैच', 'टूर्नामेंट', 'विजेता', 'cricket', 'football', 'sports', 'match', 'player'],
+  technology: ['तकनीक', 'प्रौद्योगिकी', 'स्मार्टफोन', 'इंटरनेट', 'एआई', 'कंप्यूटर', 'सॉफ्टवेयर', 'ऐप', 'गूगल', 'एप्पल', 'technology', 'AI', 'software', 'app', 'digital'],
+  entertainment: ['मनोरंजन', 'बॉलीवुड', 'फिल्म', 'सिनेमा', 'अभिनेता', 'अभिनेत्री', 'गायक', 'संगीत', 'सीरीज', 'ओटीटी', 'bollywood', 'movie', 'actor', 'music', 'entertainment'],
+  business: ['व्यापार', 'बाजार', 'शेयर', 'अर्थव्यवस्था', 'निवेश', 'कंपनी', 'स्टार्टअप', 'बैंक', 'रुपया', 'डॉलर', 'business', 'market', 'economy', 'investment', 'company'],
+  health: ['स्वास्थ्य', 'चिकित्सा', 'डॉक्टर', 'अस्पताल', 'बीमारी', 'दवा', 'वैक्सीन', 'कोविड', 'उपचार', 'health', 'medical', 'doctor', 'hospital', 'medicine'],
+  international: ['अंतरराष्ट्रीय', 'विदेश', 'अमेरिका', 'चीन', 'पाकिस्तान', 'रूस', 'यूरोप', 'संयुक्त राष्ट्र', 'international', 'USA', 'China', 'world', 'global'],
+  indian: ['भारत', 'देश', 'राष्ट्रीय', 'केंद्र', 'राज्य', 'दिल्ली', 'मुंबई', 'india', 'national', 'delhi', 'mumbai'],
+};
+
+// Extract keywords from text
+const extractKeywords = (text) => {
+  if (!text) return '';
+  const cleanText = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  const words = cleanText.split(' ').filter(w => w.length > 3);
+  const wordFreq = {};
+  words.forEach(word => {
+    const clean = word.replace(/[^\u0900-\u097F\w]/g, '').toLowerCase();
+    if (clean.length > 3) wordFreq[clean] = (wordFreq[clean] || 0) + 1;
+  });
+  return Object.entries(wordFreq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([w]) => w)
+    .join(', ');
+};
+
+// Detect category from content
+const detectCategory = (text) => {
+  if (!text) return 'indian';
+  const lowerText = text.toLowerCase();
+  let maxScore = 0;
+  let detectedCategory = 'indian';
+  
+  for (const [category, keywords] of Object.entries(categoryKeywords)) {
+    const score = keywords.filter(kw => lowerText.includes(kw.toLowerCase())).length;
+    if (score > maxScore) {
+      maxScore = score;
+      detectedCategory = category;
+    }
+  }
+  return detectedCategory;
+};
+
+// Extract title from HTML (first h1, h2, or strong text)
+const extractTitle = (html) => {
+  const h1Match = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
+  if (h1Match) return h1Match[1].replace(/<[^>]*>/g, '').trim();
+  
+  const h2Match = html.match(/<h2[^>]*>(.*?)<\/h2>/i);
+  if (h2Match) return h2Match[1].replace(/<[^>]*>/g, '').trim();
+  
+  const strongMatch = html.match(/<strong[^>]*>(.*?)<\/strong>/i);
+  if (strongMatch) return strongMatch[1].replace(/<[^>]*>/g, '').trim();
+  
+  const firstP = html.match(/<p[^>]*>(.*?)<\/p>/i);
+  if (firstP) {
+    const text = firstP[1].replace(/<[^>]*>/g, '').trim();
+    return text.length > 100 ? text.substring(0, 100) + '...' : text;
+  }
+  return '';
+};
+
+// Extract excerpt from HTML (first meaningful paragraph)
+const extractExcerpt = (html, title) => {
+  const paragraphs = html.match(/<p[^>]*>(.*?)<\/p>/gi) || [];
+  for (const p of paragraphs) {
+    const text = p.replace(/<[^>]*>/g, '').trim();
+    if (text.length > 50 && text !== title) {
+      return text.length > 200 ? text.substring(0, 200) + '...' : text;
+    }
+  }
+  return '';
+};
+
 const ArticleUploaderPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const articleId = searchParams.get('id');
   
+  const [currentStep, setCurrentStep] = useState(articleId ? 2 : 1); // 1: Upload, 2: Review, 3: Published
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(!!articleId);
+  const [extractedImages, setExtractedImages] = useState([]);
   const [articleData, setArticleData] = useState({
     title_hi: '', excerpt_hi: '',
     category: 'indian', author: '', location: '', is_breaking: false,
@@ -46,6 +125,13 @@ const ArticleUploaderPage = () => {
   const currentContent = contentData[language];
   
   const categories = Object.entries(currentContent.categories).filter(([key]) => key !== 'all');
+
+  const formatSupabaseError = (err) => {
+    if (!err) return 'Unknown error';
+    if (typeof err === 'string') return err;
+    const parts = [err.message, err.details, err.hint, err.code].filter(Boolean);
+    return parts.join(' — ');
+  };
 
   // Load article for editing
   useEffect(() => {
@@ -101,10 +187,12 @@ const ArticleUploaderPage = () => {
     if (!file) return;
 
     setIsProcessing(true);
-    toast({ title: 'Processing...', description: 'Converting .docx file...' });
+    toast({ title: 'स्मार्ट प्रोसेसिंग...', description: 'AI द्वारा .docx फ़ाइल विश्लेषण हो रहा है...' });
 
     try {
       const mammoth = await getMammoth();
+      const uploadedImages = [];
+      
       const options = {
         transformDocument: mammoth.transforms.paragraph((paragraph) => {
           let newChildren = [];
@@ -121,6 +209,8 @@ const ArticleUploaderPage = () => {
                     let iframeHtml;
                     if (youtubeMatch) {
                       iframeHtml = `<iframe src="https://www.youtube.com/embed/${youtubeMatch[1]}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+                      // Auto-fill video URL
+                      setArticleData(prev => ({ ...prev, video_url: iframeHtml }));
                     } else {
                       iframeHtml = `<iframe src="https://player.vimeo.com/video/${vimeoMatch[1]}" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
                     }
@@ -156,17 +246,43 @@ const ArticleUploaderPage = () => {
             .from('article-images')
             .getPublicUrl(uploadData.path);
 
+          uploadedImages.push(urlData.publicUrl);
           return { src: urlData.publicUrl };
         })
       };
 
       const { value: html } = await mammoth.convert({ arrayBuffer: await file.arrayBuffer() }, options);
-      const firstImageUrl = html.match(/<img src="(.*?)"/)?.[1] || '';
-
+      
+      // Extract all data from the document
+      const extractedTitle = extractTitle(html);
+      const extractedExcerpt = extractExcerpt(html, extractedTitle);
+      const detectedCategory = detectCategory(html);
+      const keywords = extractKeywords(html);
+      const firstImageUrl = uploadedImages[0] || html.match(/<img src="(.*?)"/)?.[1] || '';
+      
+      // Store extracted images
+      setExtractedImages(uploadedImages);
+      
+      // Auto-fill all fields
       setContentHtml(html);
-      setFeaturedImageUrl(prev => prev || firstImageUrl);
+      setFeaturedImageUrl(firstImageUrl);
+      setArticleData(prev => ({
+        ...prev,
+        title_hi: extractedTitle || prev.title_hi,
+        excerpt_hi: extractedExcerpt || prev.excerpt_hi,
+        category: detectedCategory,
+        seo_title_hi: extractedTitle || prev.seo_title_hi,
+        seo_keywords_hi: keywords || prev.seo_keywords_hi,
+        image_alt_text_hi: extractedTitle ? `${extractedTitle} की तस्वीर` : prev.image_alt_text_hi,
+      }));
 
-      toast({ title: 'Conversion Successful', description: 'Please fill in the remaining details.' });
+      // Move to review step
+      setCurrentStep(2);
+      
+      toast({ 
+        title: '✨ स्मार्ट एक्सट्रैक्शन पूर्ण!', 
+        description: `शीर्षक, अंश, ${uploadedImages.length} छवियां, और SEO कीवर्ड स्वचालित रूप से भरे गए।` 
+      });
     } catch (error) {
       console.error('Error processing file:', error);
       toast({ variant: 'destructive', title: 'Conversion Failed', description: error.message });
@@ -204,6 +320,13 @@ const ArticleUploaderPage = () => {
 
     setIsProcessing(true);
 
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session) {
+      toast({ title: 'Login required', description: 'Your session has expired. Please log in again.', variant: 'destructive' });
+      setIsProcessing(false);
+      return;
+    }
+
     let finalImageUrl = articleData.id ? featuredImageUrl : featuredImageUrl;
 
     if (featuredImageFile) {
@@ -228,6 +351,7 @@ const ArticleUploaderPage = () => {
         image_url: finalImageUrl,
         published_at: articleData.id ? articleData.published_at : new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        user_id: sessionData.session.user.id, // Add user_id for RLS
       };
 
       delete finalData.created_at;
@@ -239,7 +363,7 @@ const ArticleUploaderPage = () => {
       navigate('/dashboard');
     } catch (error) {
       console.error('Error saving article:', error);
-      toast({ variant: 'destructive', title: 'Save Failed', description: error.message });
+      toast({ variant: 'destructive', title: 'Save Failed', description: formatSupabaseError(error) });
     } finally {
       setIsProcessing(false);
     }
@@ -247,6 +371,100 @@ const ArticleUploaderPage = () => {
 
   const handleBackToHome = () => navigate('/');
   const handleCancel = () => navigate('/dashboard');
+  const handleBackToUpload = () => setCurrentStep(1);
+
+  // Step indicator component
+  const StepIndicator = () => (
+    <div className="flex items-center justify-center gap-2 mb-6">
+      <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${currentStep >= 1 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'}`}>
+        <Upload className="h-4 w-4" />
+        <span className="text-sm font-medium hidden sm:inline">अपलोड</span>
+      </div>
+      <div className={`w-8 h-0.5 ${currentStep >= 2 ? 'bg-primary' : 'bg-gray-300'}`} />
+      <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${currentStep >= 2 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'}`}>
+        <Eye className="h-4 w-4" />
+        <span className="text-sm font-medium hidden sm:inline">समीक्षा</span>
+      </div>
+      <div className={`w-8 h-0.5 ${currentStep >= 3 ? 'bg-primary' : 'bg-gray-300'}`} />
+      <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${currentStep >= 3 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
+        <CheckCircle2 className="h-4 w-4" />
+        <span className="text-sm font-medium hidden sm:inline">प्रकाशित</span>
+      </div>
+    </div>
+  );
+
+  // Step 1: Upload DOCX
+  const UploadStep = () => (
+    <div className="flex flex-col items-center justify-center min-h-[400px] p-8">
+      <div className="max-w-lg w-full text-center">
+        <div className="mb-6">
+          <div className="w-20 h-20 mx-auto bg-gradient-to-br from-primary/20 to-primary/10 rounded-full flex items-center justify-center mb-4">
+            <Sparkles className="h-10 w-10 text-primary" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            स्मार्ट आर्टिकल अपलोडर
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            बस अपनी .docx फ़ाइल अपलोड करें - AI स्वचालित रूप से सभी फ़ील्ड भर देगा!
+          </p>
+        </div>
+
+        <label 
+          htmlFor="docx-upload-main" 
+          className={`block w-full p-8 rounded-2xl border-2 border-dashed transition-all cursor-pointer
+            ${isProcessing 
+              ? 'border-primary bg-primary/5 cursor-wait' 
+              : 'border-gray-300 dark:border-gray-600 hover:border-primary hover:bg-primary/5'
+            }`}
+        >
+          {isProcessing ? (
+            <div className="flex flex-col items-center">
+              <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
+              <p className="text-lg font-medium text-primary">AI विश्लेषण जारी है...</p>
+              <p className="text-sm text-gray-500 mt-2">शीर्षक, छवियां, और कीवर्ड निकाले जा रहे हैं</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center">
+              <FileText className="h-12 w-12 text-gray-400 mb-4" />
+              <p className="text-lg font-medium text-gray-700 dark:text-gray-300">
+                .docx फ़ाइल यहाँ ड्रॉप करें
+              </p>
+              <p className="text-sm text-gray-500 mt-2">या क्लिक करके चुनें</p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-700">
+                  <CheckCircle2 className="h-3 w-3 mr-1" /> Auto Title
+                </span>
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-green-100 text-green-700">
+                  <CheckCircle2 className="h-3 w-3 mr-1" /> Auto Images
+                </span>
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-700">
+                  <CheckCircle2 className="h-3 w-3 mr-1" /> Auto SEO
+                </span>
+              </div>
+            </div>
+          )}
+          <input 
+            id="docx-upload-main" 
+            type="file" 
+            className="sr-only" 
+            accept=".docx" 
+            onChange={handleFileChange} 
+            disabled={isProcessing} 
+          />
+        </label>
+
+        <div className="mt-6 text-sm text-gray-500">
+          <p>समर्थित प्रारूप: Microsoft Word (.docx)</p>
+        </div>
+
+        <div className="mt-8 flex justify-center">
+          <Button variant="outline" onClick={() => setCurrentStep(2)}>
+            मैन्युअल एंट्री करें →
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 
   if (isLoading) {
     return (
@@ -277,7 +495,7 @@ const ArticleUploaderPage = () => {
             <Button 
               variant="outline" 
               size="icon" 
-              onClick={handleCancel}
+              onClick={currentStep === 1 ? handleCancel : handleBackToUpload}
               className="shrink-0"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -287,37 +505,62 @@ const ArticleUploaderPage = () => {
                 {articleId ? 'लेख संपादित करें' : 'नया लेख अपलोड करें'}
               </h1>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                {articleId ? 'Edit Article' : 'Upload New Article'}
+                {articleId ? 'Edit Article' : 'Smart Article Uploader'}
               </p>
             </div>
           </div>
           
-          <div className="flex gap-2 sm:gap-3">
-            <Button 
-              variant="outline" 
-              onClick={handleCancel} 
-              disabled={isProcessing}
-              className="flex-1 sm:flex-none"
-            >
-              <X className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">रद्द करें</span>
-              <span className="sm:hidden">Cancel</span>
-            </Button>
-            <Button 
-              onClick={handleSave} 
-              disabled={isProcessing || !articleData.title_hi}
-              className="flex-1 sm:flex-none"
-            >
-              {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-              <span className="hidden sm:inline">सहेजें और प्रकाशित करें</span>
-              <span className="sm:hidden">Save</span>
-            </Button>
-          </div>
+          {currentStep === 2 && (
+            <div className="flex gap-2 sm:gap-3">
+              <Button 
+                variant="outline" 
+                onClick={handleCancel} 
+                disabled={isProcessing}
+                className="flex-1 sm:flex-none"
+              >
+                <X className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">रद्द करें</span>
+                <span className="sm:hidden">Cancel</span>
+              </Button>
+              <Button 
+                onClick={handleSave} 
+                disabled={isProcessing || !articleData.title_hi}
+                className="flex-1 sm:flex-none"
+              >
+                {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                <span className="hidden sm:inline">प्रकाशित करें</span>
+                <span className="sm:hidden">Publish</span>
+              </Button>
+            </div>
+          )}
         </div>
 
-        {/* Main Form */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="p-4 md:p-6 lg:p-8 space-y-6 md:space-y-8">
+        {/* Step Indicator */}
+        <StepIndicator />
+
+        {/* Step Content */}
+        {currentStep === 1 && <UploadStep />}
+
+        {currentStep === 2 && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {/* Auto-extracted info banner */}
+            {extractedImages.length > 0 && (
+              <div className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 p-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                      ✨ स्मार्ट एक्सट्रैक्शन पूर्ण!
+                    </p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      {extractedImages.length} छवियां निकाली गईं • श्रेणी: {currentContent.categories[articleData.category] || articleData.category} • SEO कीवर्ड जनरेट किए गए
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="p-4 md:p-6 lg:p-8 space-y-6 md:space-y-8">
             
             {/* Basic Info Section */}
             <section>
@@ -401,6 +644,34 @@ const ArticleUploaderPage = () => {
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">
                 मीडिया (Media)
               </h2>
+              
+              {/* Extracted Images Gallery */}
+              {extractedImages.length > 0 && (
+                <div className="mb-6">
+                  <Label className="text-sm font-medium mb-3 block">डॉक्यूमेंट से निकाली गई छवियां (Extracted Images) - क्लिक करके फीचर्ड इमेज चुनें</Label>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                    {extractedImages.map((imgUrl, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setFeaturedImageUrl(imgUrl)}
+                        className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105
+                          ${featuredImageUrl === imgUrl 
+                            ? 'border-primary ring-2 ring-primary ring-offset-2' 
+                            : 'border-gray-200 dark:border-gray-700 hover:border-primary/50'
+                          }`}
+                      >
+                        <img src={imgUrl} alt={`Extracted ${idx + 1}`} className="w-full h-full object-cover" />
+                        {featuredImageUrl === imgUrl && (
+                          <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                            <CheckCircle2 className="h-6 w-6 text-white drop-shadow-lg" />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Featured Image */}
                 <div className="space-y-3">
@@ -424,12 +695,12 @@ const ArticleUploaderPage = () => {
                   </div>
                 </div>
 
-                {/* DOCX Import */}
+                {/* Re-import DOCX */}
                 <div className="space-y-3">
-                  <Label className="text-sm font-medium">.docx से आयात करें (Import from .docx)</Label>
+                  <Label className="text-sm font-medium">नई .docx फ़ाइल अपलोड करें</Label>
                   <label htmlFor="docx-upload" className="flex flex-col items-center justify-center w-full h-32 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 cursor-pointer hover:border-primary hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                     <FileText className="h-10 w-10 text-gray-400 mb-2" />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">क्लिक करें या फ़ाइल खींचें</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">दूसरी फ़ाइल अपलोड करें</span>
                     <span className="text-xs text-gray-500 mt-1">DOCX (Max 10MB)</span>
                     <input id="docx-upload" type="file" className="sr-only" accept=".docx" onChange={handleFileChange} disabled={isProcessing} />
                   </label>
@@ -501,30 +772,31 @@ const ArticleUploaderPage = () => {
                 dangerouslySetInnerHTML={{ __html: contentHtml || '<p class="text-gray-500 italic">.docx आयात के बाद सामग्री यहां दिखाई देगी।</p>' }}
               />
             </section>
-          </div>
+            </div>
 
-          {/* Sticky Footer Actions (Mobile) */}
-          <div className="sticky bottom-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 md:hidden">
-            <div className="flex gap-3">
-              <Button 
-                variant="outline" 
-                onClick={handleCancel} 
-                disabled={isProcessing}
-                className="flex-1"
-              >
-                रद्द करें
-              </Button>
-              <Button 
-                onClick={handleSave} 
-                disabled={isProcessing || !articleData.title_hi}
-                className="flex-1"
-              >
-                {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                सहेजें
-              </Button>
+            {/* Sticky Footer Actions (Mobile) */}
+            <div className="sticky bottom-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 md:hidden">
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={handleCancel} 
+                  disabled={isProcessing}
+                  className="flex-1"
+                >
+                  रद्द करें
+                </Button>
+                <Button 
+                  onClick={handleSave} 
+                  disabled={isProcessing || !articleData.title_hi}
+                  className="flex-1"
+                >
+                  {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  प्रकाशित करें
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </main>
       
       <Footer currentContent={currentContent} onNavigate={() => {}} onSelectCategory={() => {}} />

@@ -24,29 +24,62 @@ const HomePage = () => {
   const language = 'hi';
   const [darkMode, setDarkMode] = useState(false);
   const [email, setEmail] = useState('');
+  const [featuredArticle, setFeaturedArticle] = useState(null);
   const [articles, setArticles] = useState([]);
   const [trendingDbTopics, setTrendingDbTopics] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isUploaderOpen, setIsUploaderOpen] = useState(false);
   const [activeLegalPage, setActiveLegalPage] = useState(null);
-  const [page, setPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(10);
+  const [nextFrom, setNextFrom] = useState(0);
   const [hasMore, setHasMore] = useState(true);
 
   const baseUrl = window.location.origin;
 
-  const PAGE_SIZE = 24;
+  const INITIAL_FETCH_SIZE = 11; // fetch a little extra so featured can be excluded while still showing 10
+  const LOAD_MORE_SIZE = 10;
 
-  const fetchNews = useCallback(async () => {
-    setIsLoading(true);
-    const from = 0;
-    const to = PAGE_SIZE - 1;
+  const ARTICLES_CACHE_KEY = `home:${language}:articles:v1`;
+  const TRENDING_CACHE_KEY = `home:${language}:trending:v1`;
+  const CACHE_TTL_MS = 1000 * 60 * 3; // 3 minutes
 
+  const listSelect =
+    'id,title_hi,excerpt_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,views,time_ago,video_url';
+
+  const fetchFeatured = useCallback(async () => {
     const { data, error } = await supabase
       .from('articles')
-      .select('id,title_hi,excerpt_hi,content_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,views,time_ago,seo_title_hi,seo_keywords_hi,video_url')
+      .select(listSelect)
+      .eq('is_featured', true)
       .order('published_at', { ascending: false })
-      .range(from, to);
+      .limit(1);
+
+    if (error) {
+      console.error('Error fetching featured article:', error);
+      return null;
+    }
+
+    return data?.[0] ?? null;
+  }, [listSelect]);
+
+  const fetchNews = useCallback(async ({ showLoader = true } = {}) => {
+    if (showLoader) setIsLoading(true);
+
+    const from = 0;
+    const to = INITIAL_FETCH_SIZE - 1;
+
+    const [featured, latest] = await Promise.all([
+      fetchFeatured(),
+      supabase
+        .from('articles')
+        .select(listSelect)
+        .order('published_at', { ascending: false })
+        .range(from, to),
+    ]);
+
+    const { data, error } = latest;
 
     if (error) {
       console.error('Error fetching articles:', error);
@@ -55,48 +88,131 @@ const HomePage = () => {
         description: 'Could not load articles from the database.',
         variant: 'destructive',
       });
+      setFeaturedArticle(null);
       setArticles([]);
-    } else {
-      setArticles(data);
-      setPage(1);
-      setHasMore((data?.length || 0) === PAGE_SIZE);
+      setVisibleCount(10);
+      setNextFrom(0);
+      setHasMore(false);
+      if (showLoader) setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
-  }, []);
+
+    const fallbackFeatured = data?.[0] ?? null;
+    const finalFeatured = featured ?? fallbackFeatured;
+    const filtered = (data || []).filter((a) => a?.id && a.id !== finalFeatured?.id);
+
+    setFeaturedArticle(finalFeatured);
+    setArticles(filtered);
+    setVisibleCount(10);
+    setNextFrom(data?.length || 0);
+    setHasMore((data?.length || 0) === INITIAL_FETCH_SIZE);
+
+    try {
+      sessionStorage.setItem(
+        ARTICLES_CACHE_KEY,
+        JSON.stringify({ ts: Date.now(), featured: finalFeatured, articles: filtered, nextFrom: data?.length || 0, hasMore: (data?.length || 0) === INITIAL_FETCH_SIZE })
+      );
+    } catch {
+      // ignore cache write issues
+    }
+
+    if (showLoader) setIsLoading(false);
+  }, [ARTICLES_CACHE_KEY, INITIAL_FETCH_SIZE, fetchFeatured, listSelect]);
 
   const fetchMoreNews = useCallback(async () => {
-    if (isLoading || !hasMore) return;
-    const nextPage = page + 1;
-    const from = (nextPage - 1) * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
+    if (isLoadingMore || !hasMore) return;
+
+    setIsLoadingMore(true);
+    const from = nextFrom;
+    const to = from + LOAD_MORE_SIZE - 1;
 
     const { data, error } = await supabase
       .from('articles')
-      .select('id,title_hi,excerpt_hi,content_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,views,time_ago,seo_title_hi,seo_keywords_hi,video_url')
+      .select(listSelect)
       .order('published_at', { ascending: false })
       .range(from, to);
 
     if (error) {
       console.error('Error fetching more articles:', error);
       setHasMore(false);
+      setIsLoadingMore(false);
       return;
     }
 
-    setArticles((prev) => [...prev, ...(data || [])]);
-    setPage(nextPage);
-    setHasMore((data?.length || 0) === PAGE_SIZE);
-  }, [hasMore, isLoading, page]);
+    const filtered = (data || []).filter((a) => a?.id && a.id !== featuredArticle?.id);
+    setArticles((prev) => [...prev, ...filtered]);
+    setNextFrom(from + (data?.length || 0));
+    setHasMore((data?.length || 0) === LOAD_MORE_SIZE);
+    setIsLoadingMore(false);
+  }, [LOAD_MORE_SIZE, featuredArticle?.id, hasMore, isLoadingMore, listSelect, nextFrom]);
+
+  const handleLoadMore = async () => {
+    const target = visibleCount + LOAD_MORE_SIZE;
+    setVisibleCount(target);
+
+    if (target <= articles.length) return;
+    if (!hasMore) return;
+    await fetchMoreNews();
+  };
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'light';
     setDarkMode(savedTheme === 'dark');
     document.documentElement.classList.toggle('dark', savedTheme === 'dark');
     document.documentElement.lang = 'hi';
-    fetchNews();
-    fetchTrendingTopics();
-  }, [fetchNews]);
+
+    let isMounted = true;
+
+    const loadData = async () => {
+      // Fast path: render cached content immediately.
+      try {
+        const cached = JSON.parse(sessionStorage.getItem(ARTICLES_CACHE_KEY) || 'null');
+        if (cached?.ts && Array.isArray(cached?.articles) && Date.now() - cached.ts < CACHE_TTL_MS) {
+          if (isMounted) {
+            setFeaturedArticle(cached.featured || null);
+            setArticles(cached.articles);
+            setVisibleCount(10);
+            setNextFrom(typeof cached.nextFrom === 'number' ? cached.nextFrom : cached.articles.length);
+            setHasMore(!!cached.hasMore);
+            setIsLoading(false);
+          }
+          // Refresh in background
+          fetchNews({ showLoader: false });
+        } else {
+          await fetchNews({ showLoader: true });
+        }
+      } catch {
+        await fetchNews({ showLoader: true });
+      }
+
+      fetchTrendingTopics();
+    };
+
+    loadData();
+
+    // Safety timeout - ensure loading is false after 10 seconds max
+    const timeout = setTimeout(() => {
+      if (isMounted) {
+        setIsLoading(false);
+      }
+    }, 10000);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeout);
+    };
+  }, []);
 
   const fetchTrendingTopics = async () => {
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(TRENDING_CACHE_KEY) || 'null');
+      if (cached?.ts && Array.isArray(cached?.data) && Date.now() - cached.ts < CACHE_TTL_MS) {
+        setTrendingDbTopics(cached.data);
+      }
+    } catch {
+      // ignore cache read issues
+    }
+
     const { data, error } = await supabase
       .from('trending_topics')
       .select('name_en,name_hi,rank')
@@ -106,6 +222,12 @@ const HomePage = () => {
       console.error('Error fetching trending topics:', error);
     } else {
       setTrendingDbTopics(data);
+
+      try {
+        sessionStorage.setItem(TRENDING_CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+      } catch {
+        // ignore cache write issues
+      }
     }
   };
 
@@ -191,15 +313,17 @@ const HomePage = () => {
       ...article,
       title: article.title_hi || currentContent.notAvailable || 'उपलब्ध नहीं',
       excerpt: article.excerpt_hi || '',
-      content: article.content_hi || '',
       image_alt_text: article.image_alt_text_hi || article.title_hi || currentContent.notAvailable || 'उपलब्ध नहीं',
     };
   };
 
+  const translatedFeaturedArticle = useMemo(() => getTranslatedArticle(featuredArticle), [featuredArticle]);
   const translatedArticles = useMemo(() => articles.map(getTranslatedArticle), [articles]);
-  const breakingNews = useMemo(() => translatedArticles.filter(a => a.is_breaking).slice(0, 5), [translatedArticles]);
-  const featuredArticle = useMemo(() => translatedArticles.find(a => a.is_featured) || translatedArticles[0], [translatedArticles]);
-  const otherArticles = useMemo(() => translatedArticles.filter(a => a.id !== featuredArticle?.id), [translatedArticles, featuredArticle]);
+  const visibleArticles = useMemo(() => translatedArticles.slice(0, visibleCount), [translatedArticles, visibleCount]);
+  const breakingNews = useMemo(() => {
+    const all = [translatedFeaturedArticle, ...translatedArticles].filter(Boolean);
+    return all.filter((a) => a.is_breaking).slice(0, 5);
+  }, [translatedArticles, translatedFeaturedArticle]);
 
   const renderContent = () => {
     if (activeLegalPage) {
@@ -214,12 +338,12 @@ const HomePage = () => {
     }
     return (
       <div className="space-y-12">
-        <FeaturedArticleHero article={featuredArticle} content={currentContent} onReadMore={() => handleArticleSelect(featuredArticle)} />
+        <FeaturedArticleHero article={translatedFeaturedArticle} content={currentContent} onReadMore={() => handleArticleSelect(translatedFeaturedArticle)} />
         <div className="space-y-6">
-          <ArticleGrid articles={otherArticles} content={currentContent} onArticleClick={handleArticleSelect} />
-          {!activeLegalPage && !isLoading && hasMore && (
+          <ArticleGrid articles={visibleArticles} content={currentContent} onArticleClick={handleArticleSelect} />
+          {!activeLegalPage && !isLoading && (hasMore || visibleCount < translatedArticles.length) && (
             <div className="flex justify-center">
-              <Button onClick={fetchMoreNews} variant="outline" className="w-full sm:w-auto">
+              <Button onClick={handleLoadMore} variant="outline" className="w-full sm:w-auto" disabled={isLoadingMore}>
                 और खबरें देखें
               </Button>
             </div>

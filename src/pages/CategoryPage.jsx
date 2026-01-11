@@ -25,23 +25,33 @@ const CategoryPage = () => {
   const [articles, setArticles] = useState([]);
   const [trendingDbTopics, setTrendingDbTopics] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isUploaderOpen, setIsUploaderOpen] = useState(false);
-  const [page, setPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(10);
+  const [nextFrom, setNextFrom] = useState(0);
   const [hasMore, setHasMore] = useState(true);
 
   const baseUrl = window.location.origin;
 
-  const PAGE_SIZE = 24;
+  const INITIAL_FETCH_SIZE = 11;
+  const LOAD_MORE_SIZE = 10;
 
-  const fetchNews = useCallback(async () => {
-    setIsLoading(true);
+  const ARTICLES_CACHE_KEY = `category:${language}:${categoryKey || 'all'}:articles:v1`;
+  const TRENDING_CACHE_KEY = `category:${language}:trending:v1`;
+  const CACHE_TTL_MS = 1000 * 60 * 3; // 3 minutes
+
+  const listSelect =
+    'id,title_hi,excerpt_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,views,time_ago,video_url';
+
+  const fetchNews = useCallback(async ({ showLoader = true } = {}) => {
+    if (showLoader) setIsLoading(true);
     const from = 0;
-    const to = PAGE_SIZE - 1;
+    const to = INITIAL_FETCH_SIZE - 1;
 
     let query = supabase
       .from('articles')
-      .select('id,title_hi,excerpt_hi,content_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,views,time_ago,seo_title_hi,seo_keywords_hi,video_url')
+      .select(listSelect)
       .order('published_at', { ascending: false })
       .range(from, to);
     if (categoryKey) {
@@ -60,21 +70,29 @@ const CategoryPage = () => {
       setArticles([]);
     } else {
       setArticles(data);
-      setPage(1);
-      setHasMore((data?.length || 0) === PAGE_SIZE);
+      setVisibleCount(10);
+      setNextFrom(data?.length || 0);
+      setHasMore((data?.length || 0) === INITIAL_FETCH_SIZE);
+
+      try {
+        sessionStorage.setItem(ARTICLES_CACHE_KEY, JSON.stringify({ ts: Date.now(), articles: data, nextFrom: data?.length || 0, hasMore: (data?.length || 0) === INITIAL_FETCH_SIZE }));
+      } catch {
+        // ignore cache write issues
+      }
     }
-    setIsLoading(false);
-  }, [categoryKey]);
+    if (showLoader) setIsLoading(false);
+  }, [ARTICLES_CACHE_KEY, INITIAL_FETCH_SIZE, categoryKey, listSelect]);
 
   const fetchMoreNews = useCallback(async () => {
-    if (isLoading || !hasMore) return;
-    const nextPage = page + 1;
-    const from = (nextPage - 1) * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
+    if (isLoadingMore || !hasMore) return;
+
+    setIsLoadingMore(true);
+    const from = nextFrom;
+    const to = from + LOAD_MORE_SIZE - 1;
 
     let query = supabase
       .from('articles')
-      .select('id,title_hi,excerpt_hi,content_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,views,time_ago,seo_title_hi,seo_keywords_hi,video_url')
+      .select(listSelect)
       .order('published_at', { ascending: false })
       .range(from, to);
     if (categoryKey) {
@@ -85,24 +103,60 @@ const CategoryPage = () => {
     if (error) {
       console.error('Error fetching more articles:', error);
       setHasMore(false);
+      setIsLoadingMore(false);
       return;
     }
 
     setArticles((prev) => [...prev, ...(data || [])]);
-    setPage(nextPage);
-    setHasMore((data?.length || 0) === PAGE_SIZE);
-  }, [categoryKey, hasMore, isLoading, page]);
+    setNextFrom(from + (data?.length || 0));
+    setHasMore((data?.length || 0) === LOAD_MORE_SIZE);
+    setIsLoadingMore(false);
+  }, [LOAD_MORE_SIZE, categoryKey, hasMore, isLoadingMore, listSelect, nextFrom]);
+
+  const handleLoadMore = async () => {
+    const target = visibleCount + LOAD_MORE_SIZE;
+    setVisibleCount(target);
+
+    if (target <= articles.length) return;
+    if (!hasMore) return;
+    await fetchMoreNews();
+  };
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'light';
     setDarkMode(savedTheme === 'dark');
     document.documentElement.classList.toggle('dark', savedTheme === 'dark');
     document.documentElement.lang = 'hi';
-    fetchNews();
+
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(ARTICLES_CACHE_KEY) || 'null');
+      if (cached?.ts && Array.isArray(cached?.articles) && Date.now() - cached.ts < CACHE_TTL_MS) {
+        setArticles(cached.articles);
+        setVisibleCount(10);
+        setNextFrom(typeof cached.nextFrom === 'number' ? cached.nextFrom : cached.articles.length);
+        setHasMore(!!cached.hasMore);
+        setIsLoading(false);
+        fetchNews({ showLoader: false });
+      } else {
+        fetchNews({ showLoader: true });
+      }
+    } catch {
+      fetchNews({ showLoader: true });
+    }
+
     fetchTrendingTopics();
   }, [fetchNews]);
 
   const fetchTrendingTopics = async () => {
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(TRENDING_CACHE_KEY) || 'null');
+      if (cached?.ts && Array.isArray(cached?.data) && Date.now() - cached.ts < CACHE_TTL_MS) {
+        setTrendingDbTopics(cached.data);
+      }
+    } catch {
+      // ignore cache read issues
+    }
+
     const { data, error } = await supabase
       .from('trending_topics')
       .select('name_en,name_hi,rank')
@@ -112,6 +166,12 @@ const CategoryPage = () => {
       console.error('Error fetching trending topics:', error);
     } else {
       setTrendingDbTopics(data);
+
+      try {
+        sessionStorage.setItem(TRENDING_CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+      } catch {
+        // ignore cache write issues
+      }
     }
   };
 
@@ -190,12 +250,12 @@ const CategoryPage = () => {
       ...article,
       title: article.title_hi || currentContent.notAvailable || 'उपलब्ध नहीं',
       excerpt: article.excerpt_hi || '',
-      content: article.content_hi || '',
       image_alt_text: article.image_alt_text_hi || article.title_hi || currentContent.notAvailable || 'उपलब्ध नहीं',
     };
   };
 
   const translatedArticles = useMemo(() => articles.map(getTranslatedArticle), [articles]);
+  const visibleArticles = useMemo(() => translatedArticles.slice(0, visibleCount), [translatedArticles, visibleCount]);
 
   const renderContent = () => {
     if (isLoading) {
@@ -250,7 +310,7 @@ const CategoryPage = () => {
 
     return (
       <div className="space-y-12">
-        <ArticleGrid articles={translatedArticles} content={currentContent} onArticleClick={handleArticleSelect} />
+        <ArticleGrid articles={visibleArticles} content={currentContent} onArticleClick={handleArticleSelect} />
       </div>
     );
   };
@@ -291,7 +351,7 @@ const CategoryPage = () => {
 
             {!isLoading && hasMore && (
               <div className="flex justify-center mt-6">
-                <Button onClick={fetchMoreNews} variant="outline" className="w-full sm:w-auto">
+                <Button onClick={handleLoadMore} variant="outline" className="w-full sm:w-auto" disabled={isLoadingMore}>
                   और खबरें देखें
                 </Button>
               </div>

@@ -61,10 +61,10 @@ const Header = ({
                 size="sm"
                 onClick={onLoginClick}
                 className="flex items-center space-x-1 text-white/90 hover:text-white bg-white/10 hover:bg-white/20 transition-colors"
-                aria-label="Login or Sign Up"
+                aria-label="Login"
               >
                 <User className="h-4 w-4 sm:h-5 sm:w-5" />
-                <span className="text-xs sm:text-sm">लॉगिन / साइन अप</span>
+                <span className="text-xs sm:text-sm">लॉगिन</span>
               </Button>
             )}
             <Button

@@ -9,13 +9,12 @@ import { Loader2 } from 'lucide-react';
 
 // Optional full-page auth card.
 // Your app currently uses AuthModal; keep this for future routes/admin pages.
-const Auth = ({ mode = 'login', onSuccess }) => {
-  const { signIn, signUp } = useAuth();
+const Auth = ({ mode: _mode = 'login', onSuccess }) => {
+  const { signIn } = useAuth();
   const { toast } = useToast();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -23,15 +22,9 @@ const Auth = ({ mode = 'login', onSuccess }) => {
     setIsLoading(true);
 
     try {
-      if (mode === 'signup') {
-        const { error } = await signUp(email, password, fullName);
-        if (error) throw error;
-        toast({ title: 'Signup successful', description: 'Please check your email to verify your account.' });
-      } else {
-        const { error } = await signIn(email, password);
-        if (error) throw error;
-        toast({ title: 'Login successful', description: 'Welcome back!' });
-      }
+      const { error } = await signIn(email, password);
+      if (error) throw error;
+      toast({ title: 'Login successful', description: 'Welcome back!' });
 
       onSuccess?.();
     } catch (error) {
@@ -44,18 +37,11 @@ const Auth = ({ mode = 'login', onSuccess }) => {
   return (
     <Card className="max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>{mode === 'signup' ? 'Create account' : 'Log in'}</CardTitle>
-        <CardDescription>{mode === 'signup' ? 'Sign up to continue.' : 'Log in to continue.'}</CardDescription>
+        <CardTitle>Log in</CardTitle>
+        <CardDescription>Log in to continue.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {mode === 'signup' ? (
-            <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name</Label>
-              <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-            </div>
-          ) : null}
-
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -68,7 +54,7 @@ const Auth = ({ mode = 'login', onSuccess }) => {
 
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {mode === 'signup' ? 'Create Account' : 'Login'}
+            Login
           </Button>
         </form>
       </CardContent>

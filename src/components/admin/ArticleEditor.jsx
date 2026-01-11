@@ -31,6 +31,13 @@ const getMammoth = () => {
 const ArticleEditor = ({ isOpen, onClose, article, onSave, currentContent, categories }) => {
   const { toast } = useToast();
 
+  const formatSupabaseError = (err) => {
+    if (!err) return 'Unknown error';
+    if (typeof err === 'string') return err;
+    const parts = [err.message, err.details, err.hint, err.code].filter(Boolean);
+    return parts.join(' — ');
+  };
+
   const defaultCategory = categories?.[0]?.[0] || 'indian';
 
   const [isBusy, setIsBusy] = useState(false);
@@ -160,6 +167,12 @@ const ArticleEditor = ({ isOpen, onClose, article, onSave, currentContent, categ
     setIsBusy(true);
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        toast({ variant: 'destructive', title: 'Login required', description: 'Your session has expired. Please log in again.' });
+        return;
+      }
+
       let finalImageUrl = featuredPreviewUrl || article?.image_url || '';
 
       if (featuredImageFile) {
@@ -182,6 +195,7 @@ const ArticleEditor = ({ isOpen, onClose, article, onSave, currentContent, categ
         image_url: finalImageUrl,
         updated_at: nowIso,
         published_at: formData.id ? article?.published_at : nowIso,
+        user_id: sessionData.session.user.id, // Add user_id for RLS
       };
 
       const { error } = await supabase.from('articles').upsert(payload);
@@ -191,7 +205,7 @@ const ArticleEditor = ({ isOpen, onClose, article, onSave, currentContent, categ
       onSave?.();
       onClose?.();
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Save failed', description: error?.message || 'Could not save article.' });
+      toast({ variant: 'destructive', title: 'Save failed', description: formatSupabaseError(error) });
     } finally {
       setIsBusy(false);
     }

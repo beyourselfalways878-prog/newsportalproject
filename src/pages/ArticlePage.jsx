@@ -13,7 +13,7 @@ import { Loader2 } from 'lucide-react';
 const ArticlePage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [article, setArticle] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
@@ -69,7 +69,7 @@ const ArticlePage = () => {
   };
 
   const handleEditArticle = (articleToEdit) => {
-    if (user?.email === 'pushkarraj207@gmail.com') {
+    if (canEdit) {
       setEditingArticle(articleToEdit);
       setIsUploaderOpen(true);
     } else {
@@ -101,7 +101,9 @@ const ArticlePage = () => {
     };
   };
 
-  const canEdit = user?.email === 'pushkarraj207@gmail.com';
+  const canEdit =
+    user?.email === 'pushkarraj207@gmail.com' ||
+    ['admin', 'superuser'].includes(profile?.role);
 
   return (
     <>
