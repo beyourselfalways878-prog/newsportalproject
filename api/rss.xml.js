@@ -5,6 +5,13 @@ export default async function handler(req, res) {
     const siteUrl = getSiteUrl(req);
     const supabase = getSupabaseAdminReadClient();
 
+    const toCdata = (value) => {
+      const raw = String(value ?? '');
+      // If content contains ']]>', split CDATA sections to keep the XML valid.
+      const safe = raw.replace(/]]>/g, ']]]]><![CDATA[>');
+      return `<![CDATA[${safe}]]>`;
+    };
+
     const { data: articles, error } = await supabase
       .from('articles')
       .select('id, title_en, title_hi, excerpt_en, excerpt_hi, category, published_at, updated_at')
@@ -36,7 +43,7 @@ export default async function handler(req, res) {
         <link>${escapeXml(link)}</link>
         <guid isPermaLink="true">${escapeXml(guid)}</guid>
         <pubDate>${escapeXml(pubDate)}</pubDate>
-        ${description ? `<description><![CDATA[${description}]]></description>` : ''}
+        ${description ? `<description>${toCdata(description)}</description>` : ''}
         ${a.category ? `<category>${escapeXml(a.category)}</category>` : ''}
       </item>`;
     });
