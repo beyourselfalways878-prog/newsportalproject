@@ -7,9 +7,12 @@
     "clean": "node scripts/clean.mjs",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:env": "node scripts/check_env.mjs",
+    "create:profile": "node scripts/create_profile.mjs --id=YOUR_USER_ID --name=\"Admin\" --role=admin"
   },
   "dependencies": {
+    "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-checkbox": "^1.3.3",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-label": "^2.1.8",

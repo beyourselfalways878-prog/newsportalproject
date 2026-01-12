@@ -195,7 +195,6 @@ const ArticleEditor = ({ isOpen, onClose, article, onSave, currentContent, categ
         image_url: finalImageUrl,
         updated_at: nowIso,
         published_at: formData.id ? article?.published_at : nowIso,
-        user_id: sessionData.session.user.id, // Add user_id for RLS
       };
 
       const { error } = await supabase.from('articles').upsert(payload);

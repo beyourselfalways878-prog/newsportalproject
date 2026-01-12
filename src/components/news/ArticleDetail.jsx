@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
     import { motion, AnimatePresence } from 'framer-motion';
     import { Helmet } from 'react-helmet-async';
     import { Button } from '@/components/ui/button';
@@ -193,12 +193,28 @@ import React, { useEffect, useState, useRef } from 'react';
 
       if (!article) return null;
 
-      const { id, title, excerpt, category, time_ago, views, author, published_at, updated_at, image_url, image_alt_text, seo_title, seo_keywords, video_url } = article;
+      const { id, title, excerpt, category, view_count, author, published_at, updated_at, image_url, image_alt_text, seo_title, seo_keywords, video_url } = article;
       const categoryName = currentContent.categories[category] || category;
       const authorName = author || (currentContent.siteName || "News Team");
       const formattedDate = published_at
         ? new Date(published_at).toLocaleDateString('hi-IN', { year: 'numeric', month: 'long', day: 'numeric' })
         : 'N/A';
+
+      // Calculate time ago
+      const time_ago = useMemo(() => {
+        if (!published_at) return 'N/A';
+        const now = new Date();
+        const published = new Date(published_at);
+        const diffMs = now - published;
+        const diffMins = Math.floor(diffMs / (1000 * 60));
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        return `${diffDays}d ago`;
+      }, [published_at]);
       const generalKeywords = "भारत समाचार आज, आज की ताजा खबर, राष्ट्रीय समाचार, भाजपा, कांग्रेस, नवीनतम समाचार, ब्रेकिंग न्यूज";
       const combinedKeywords = [seo_keywords, generalKeywords].filter(Boolean).join(', ');
 
@@ -283,7 +299,7 @@ import React, { useEffect, useState, useRef } from 'react';
                   <span className="flex items-center"><User className="h-4 w-4 mr-1.5" /> {authorName}</span>
                   <span className="flex items-center"><CalendarDays className="h-4 w-4 mr-1.5" /> {formattedDate}</span>
                   <span className="flex items-center"><Clock className="h-4 w-4 mr-1.5" /> {time_ago || 'N/A'}</span>
-                  <span className="flex items-center"><Eye className="h-4 w-4 mr-1.5" /> {views || 0} {currentContent.views}</span>
+                  <span className="flex items-center"><Eye className="h-4 w-4 mr-1.5" /> {view_count || 0} {currentContent.views}</span>
                   {article.location && <span className="flex items-center"><MapPin className="h-4 w-4 mr-1.5" /> {article.location}</span>}
                 </div>
               </header>

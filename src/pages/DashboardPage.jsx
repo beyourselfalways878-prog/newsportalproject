@@ -4,10 +4,12 @@ import { useAuth } from '@/contexts/SupabaseAuthContext.jsx';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import UserManagement from '@/components/admin/UserManagement';
+import DatabaseTest from '@/components/admin/DatabaseTest';
+import ArticleManager from '@/components/admin/ArticleManager';
 import { Button } from '@/components/ui/button';
 import { contentData } from '@/lib/data';
 import { useNavigate } from 'react-router-dom';
-import { PlusCircle, FileText, Users } from 'lucide-react';
+import { PlusCircle, FileText, Users, Database, List } from 'lucide-react';
 
 const DashboardPage = () => {
   const { profile } = useAuth();
@@ -49,7 +51,7 @@ const DashboardPage = () => {
           </div>
 
           {/* Quick Actions */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <button 
               onClick={handleNewArticle}
               className="p-4 md:p-6 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20 hover:border-primary/40 transition-colors text-left group"
@@ -72,10 +74,45 @@ const DashboardPage = () => {
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-400">User Management</p>
             </div>
+
+            <div className="p-4 md:p-6 bg-gradient-to-br from-green-500/10 to-green-500/5 rounded-xl border border-green-500/20 text-left">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-green-500/20 rounded-lg">
+                  <Database className="h-5 w-5 text-green-500" />
+                </div>
+                <h3 className="font-semibold text-gray-900 dark:text-white">Database Test</h3>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Test Connection</p>
+            </div>
+
+            <div className="p-4 md:p-6 bg-gradient-to-br from-purple-500/10 to-purple-500/5 rounded-xl border border-purple-500/20 text-left">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-purple-500/20 rounded-lg">
+                  <List className="h-5 w-5 text-purple-500" />
+                </div>
+                <h3 className="font-semibold text-gray-900 dark:text-white">सभी लेख</h3>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Manage Articles</p>
+            </div>
+          </div>
+
+          {/* Article Management Section */}
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Article Management</h2>
+            <ArticleManager />
+          </div>
+
+          {/* Database Test Section */}
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Database Diagnostics</h2>
+            <DatabaseTest />
           </div>
 
           {/* User Management Section */}
-          {profile && <UserManagement currentUserProfile={profile} />}
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">User Management</h2>
+            {profile && <UserManagement currentUserProfile={profile} />}
+          </div>
         </div>
       </main>
       <Footer currentContent={currentContent} onNavigate={() => {}} onSelectCategory={() => {}} />

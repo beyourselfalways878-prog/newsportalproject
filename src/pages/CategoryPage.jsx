@@ -42,7 +42,7 @@ const CategoryPage = () => {
   const CACHE_TTL_MS = 1000 * 60 * 3; // 3 minutes
 
   const listSelect =
-    'id,title_hi,excerpt_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,views,time_ago,video_url';
+    'id,title_hi,excerpt_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,view_count,video_url';
 
   const fetchNews = useCallback(async ({ showLoader = true } = {}) => {
     if (showLoader) setIsLoading(true);
@@ -159,7 +159,7 @@ const CategoryPage = () => {
 
     const { data, error } = await supabase
       .from('trending_topics')
-      .select('name_en,name_hi,rank')
+      .select('name_hi,rank')
       .order('rank', { ascending: true });
 
     if (error) {

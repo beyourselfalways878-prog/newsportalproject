@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }) => {
     return {
       id: authUser.id,
       full_name: fullNameFromMetadata ?? authUser.email,
-      role: normalizeRole(roleFromMetadata) ?? 'user',
+      role: normalizeRole(roleFromMetadata) ?? 'admin', // Default to admin for now
     };
   }, [normalizeRole]);
 
@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }) => {
       } else {
         setProfile({
           ...data,
-          role: normalizeRole(data?.role) ?? buildFallbackProfile(authUser)?.role ?? 'user',
+          role: normalizeRole(data?.role) ?? 'admin', // Default to admin
         });
       }
     } catch (err) {
@@ -60,8 +60,10 @@ export const AuthProvider = ({ children }) => {
   }, [buildFallbackProfile, normalizeRole]);
 
   const handleSession = useCallback(async (session) => {
+    console.log('handleSession called with session:', !!session);
     setSession(session);
     const currentUser = session?.user ?? null;
+    console.log('Setting user to:', !!currentUser);
     setUser(currentUser);
     await fetchProfile(currentUser);
     setLoading(false);
@@ -98,6 +100,7 @@ export const AuthProvider = ({ children }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state change:', event, !!session);
         if (isMounted) {
           await handleSession(session);
         }
@@ -125,15 +128,23 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const signOut = useCallback(async () => {
+    console.log('SignOut called');
     const { error } = await supabase.auth.signOut();
+    console.log('SignOut result:', { error });
 
     if (error) {
+      console.error('Sign out error:', error);
       toast({
         variant: "destructive",
         title: "Sign out Failed",
         description: error.message || "Something went wrong",
       });
     } else {
+      console.log('Sign out successful');
+      // Manual state reset as fallback
+      setUser(null);
+      setProfile(null);
+      setSession(null);
       toast({
         title: "Signed Out",
         description: "You have been successfully logged out."

@@ -1,10 +1,26 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Clock, Eye, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const ArticleCard = ({ article, content, onArticleClick, index }) => {
   if (!article) return null;
+
+  // Calculate time ago
+  const time_ago = useMemo(() => {
+    if (!article.published_at) return 'N/A';
+    const now = new Date();
+    const published = new Date(article.published_at);
+    const diffMs = now - published;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  }, [article.published_at]);
 
   return (
     <motion.article
@@ -46,11 +62,11 @@ const ArticleCard = ({ article, content, onArticleClick, index }) => {
           <div className="flex items-center space-x-3">
             <span className="flex items-center">
               <Clock className="h-3.5 w-3.5 mr-1" />
-              {article.time_ago || 'N/A'}
+              {time_ago || 'N/A'}
             </span>
             <span className="flex items-center">
               <Eye className="h-3.5 w-3.5 mr-1" />
-              {article.views || 0}
+              {article.view_count || 0}
             </span>
           </div>
           <Button variant="ghost" size="sm" className="text-xs h-auto py-1 px-2 text-primary opacity-0 group-hover:opacity-100 transition-opacity">

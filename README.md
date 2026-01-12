@@ -49,6 +49,13 @@ A modern, Hindi-only news portal built with React and Vite, featuring real-time 
    ```
    Open [http://localhost:5173](http://localhost:5173) in your browser.
 
+### Environment & Admin tools
+
+- `npm run check:env` — Validates that required env vars are set and, if `SUPABASE_SERVICE_ROLE_KEY` is available, checks DB/table and storage bucket access.
+- `npm run create:profile` — Helper script to create or upsert a `profiles` row for a given user id (edit the script args before running or call with `node scripts/create_profile.mjs --id=<USER_ID> --role=admin --name="Full Name"`).
+
+> Note: For production, add `SUPABASE_SERVICE_ROLE_KEY` and `CREATE_PROFILE_SECRET` as project secrets in your hosting provider (do NOT commit service role keys to the repository).
+
 ## 📦 Build for Production
 
 ```bash

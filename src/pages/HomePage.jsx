@@ -46,22 +46,29 @@ const HomePage = () => {
   const CACHE_TTL_MS = 1000 * 60 * 3; // 3 minutes
 
   const listSelect =
-    'id,title_hi,excerpt_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,views,time_ago,video_url';
+    'id,title_hi,excerpt_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,view_count,video_url';
 
   const fetchFeatured = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('articles')
-      .select(listSelect)
-      .eq('is_featured', true)
-      .order('published_at', { ascending: false })
-      .limit(1);
+    try {
+      const queryPromise = supabase
+        .from('articles')
+        .select(listSelect)
+        .eq('is_featured', true)
+        .order('published_at', { ascending: false })
+        .limit(1);
 
-    if (error) {
-      console.error('Error fetching featured article:', error);
+      const { data, error } = await queryPromise;
+
+      if (error) {
+        console.error('Error fetching featured article:', error);
+        return null;
+      }
+
+      return data?.[0] ?? null;
+    } catch (err) {
+      console.error('Featured fetch error:', err);
       return null;
     }
-
-    return data?.[0] ?? null;
   }, [listSelect]);
 
   const fetchNews = useCallback(async ({ showLoader = true } = {}) => {
@@ -70,22 +77,64 @@ const HomePage = () => {
     const from = 0;
     const to = INITIAL_FETCH_SIZE - 1;
 
-    const [featured, latest] = await Promise.all([
-      fetchFeatured(),
-      supabase
-        .from('articles')
-        .select(listSelect)
-        .order('published_at', { ascending: false })
-        .range(from, to),
-    ]);
+    try {
+      const [featured, latest] = await Promise.all([
+        fetchFeatured(),
+        supabase
+          .from('articles')
+          .select(listSelect)
+          .order('published_at', { ascending: false })
+          .range(from, to),
+      ]);
 
-    const { data, error } = latest;
+      const { data, error } = latest;
 
-    if (error) {
-      console.error('Error fetching articles:', error);
+      if (error) {
+        console.error('Error fetching articles:', error);
+        toast({
+          title: 'Error Fetching News',
+          description: 'Could not load articles from the database.',
+          variant: 'destructive',
+        });
+        setFeaturedArticle(null);
+        setArticles([]);
+        setVisibleCount(10);
+        setNextFrom(0);
+        setHasMore(false);
+        if (showLoader) setIsLoading(false);
+        return;
+      }
+
+      console.log('Fetched articles data:', data); // Debug log
+
+      const fallbackFeatured = data?.[0] ?? null;
+      const finalFeatured = featured ?? fallbackFeatured;
+      const filtered = (data || []).filter((a) => a?.id && a.id !== finalFeatured?.id);
+
+      console.log('Featured article:', finalFeatured); // Debug log
+      console.log('Filtered articles:', filtered); // Debug log
+
+      setFeaturedArticle(finalFeatured);
+      setArticles(filtered);
+      setVisibleCount(10);
+      setNextFrom(data?.length || 0);
+      setHasMore((data?.length || 0) === INITIAL_FETCH_SIZE);
+
+      try {
+        sessionStorage.setItem(
+          ARTICLES_CACHE_KEY,
+          JSON.stringify({ ts: Date.now(), featured: finalFeatured, articles: filtered, nextFrom: data?.length || 0, hasMore: (data?.length || 0) === INITIAL_FETCH_SIZE })
+        );
+      } catch {
+        // ignore cache write issues
+      }
+
+      if (showLoader) setIsLoading(false);
+    } catch (err) {
+      console.error('Unexpected error in fetchNews:', err);
       toast({
-        title: 'Error Fetching News',
-        description: 'Could not load articles from the database.',
+        title: 'Error Loading News',
+        description: 'An unexpected error occurred while loading articles.',
         variant: 'destructive',
       });
       setFeaturedArticle(null);
@@ -94,29 +143,7 @@ const HomePage = () => {
       setNextFrom(0);
       setHasMore(false);
       if (showLoader) setIsLoading(false);
-      return;
     }
-
-    const fallbackFeatured = data?.[0] ?? null;
-    const finalFeatured = featured ?? fallbackFeatured;
-    const filtered = (data || []).filter((a) => a?.id && a.id !== finalFeatured?.id);
-
-    setFeaturedArticle(finalFeatured);
-    setArticles(filtered);
-    setVisibleCount(10);
-    setNextFrom(data?.length || 0);
-    setHasMore((data?.length || 0) === INITIAL_FETCH_SIZE);
-
-    try {
-      sessionStorage.setItem(
-        ARTICLES_CACHE_KEY,
-        JSON.stringify({ ts: Date.now(), featured: finalFeatured, articles: filtered, nextFrom: data?.length || 0, hasMore: (data?.length || 0) === INITIAL_FETCH_SIZE })
-      );
-    } catch {
-      // ignore cache write issues
-    }
-
-    if (showLoader) setIsLoading(false);
   }, [ARTICLES_CACHE_KEY, INITIAL_FETCH_SIZE, fetchFeatured, listSelect]);
 
   const fetchMoreNews = useCallback(async () => {
@@ -215,7 +242,7 @@ const HomePage = () => {
 
     const { data, error } = await supabase
       .from('trending_topics')
-      .select('name_en,name_hi,rank')
+      .select('name_hi,rank')
       .order('rank', { ascending: true });
 
     if (error) {

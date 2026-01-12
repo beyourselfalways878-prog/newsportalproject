@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 
 // Lightweight grid for secondary news blocks.
@@ -13,7 +13,24 @@ const MoreNewsGrid = ({ news, content, onArticleClick, title }) => {
       <h2 className="text-2xl font-bold mb-6 text-foreground">{title || content?.moreNewsTitle || 'More News'}</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {news.map((article, index) => (
+        {news.map((article, index) => {
+          // Calculate time ago for each article
+          const time_ago = useMemo(() => {
+            if (!article.published_at) return 'N/A';
+            const now = new Date();
+            const published = new Date(article.published_at);
+            const diffMs = now - published;
+            const diffMins = Math.floor(diffMs / (1000 * 60));
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+            if (diffMins < 1) return 'Just now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            if (diffHours < 24) return `${diffHours}h ago`;
+            return `${diffDays}d ago`;
+          }, [article.published_at]);
+
+          return (
           <motion.article
             key={article.id || index}
             initial={{ opacity: 0, y: 16 }}
@@ -43,12 +60,13 @@ const MoreNewsGrid = ({ news, content, onArticleClick, title }) => {
             <div className="p-4">
               <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{article.excerpt}</p>
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{article.time_ago || article.time || 'N/A'} {content?.minutesAgo || ''}</span>
-                <span>{article.views || 0} {content?.views || ''}</span>
+                <span>{time_ago || article.time || 'N/A'} {content?.minutesAgo || ''}</span>
+                <span>{article.view_count || 0} {content?.views || ''}</span>
               </div>
             </div>
           </motion.article>
-        ))}
+        );
+        })}
       </div>
     </section>
   );

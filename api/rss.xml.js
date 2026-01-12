@@ -14,7 +14,7 @@ export default async function handler(req, res) {
 
     const { data: articles, error } = await supabase
       .from('articles')
-      .select('id, title_en, title_hi, excerpt_en, excerpt_hi, category, published_at, updated_at')
+      .select('id, title_hi, excerpt_hi, category, published_at, updated_at')
       .order('published_at', { ascending: false })
       .limit(50);
 
@@ -26,12 +26,12 @@ export default async function handler(req, res) {
     }
 
     const now = new Date().toUTCString();
-    const channelTitle = '24x7 Indian News';
-    const channelDescription = 'Latest news from India & the world.';
+    const channelTitle = '24x7 इंडियन न्यूज़';
+    const channelDescription = 'भारत और दुनिया की ताज़ा ख़बरें हिंदी में।';
 
     const items = (articles || []).map((a) => {
-      const title = a.title_hi || a.title_en || 'Untitled';
-      const description = a.excerpt_hi || a.excerpt_en || '';
+      const title = a.title_hi || 'शीर्षक उपलब्ध नहीं';
+      const description = a.excerpt_hi || '';
       const link = `${siteUrl}/article/${a.id}`;
       const pubDateRaw = a.published_at || a.updated_at;
       const pubDate = pubDateRaw ? new Date(pubDateRaw).toUTCString() : now;
