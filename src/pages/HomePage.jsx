@@ -46,7 +46,7 @@ const HomePage = () => {
   const CACHE_TTL_MS = 1000 * 60 * 3; // 3 minutes
 
   const listSelect =
-    'id,title_hi,excerpt_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,view_count,video_url';
+    'id,title_hi,excerpt_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,video_url';
 
   const fetchFeatured = useCallback(async () => {
     try {
