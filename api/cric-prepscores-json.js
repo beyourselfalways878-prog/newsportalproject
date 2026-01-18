@@ -44,8 +44,30 @@ export default async function handler(req, res) {
       const teamRows = Array.from(raw.matchAll(/<tr>\s*<td[^>]*>([^<]+)<\/td>\s*<td[^>]*>([^<]+)<\/td>\s*<\/tr>/gi));
       const teams = teamRows.map((m) => ({ name: m[1].trim(), score: m[2].trim() }));
 
-      const team1 = teams[0] || null;
-      const team2 = teams[1] || null;
+      const team1 = teams[0] ? { ...teams[0] } : null;
+      const team2 = teams[1] ? { ...teams[1] } : null;
+
+      // Extract logos (criclogo images) - first two images are team logos
+      const imgMatches = Array.from(raw.matchAll(/<img[^>]*class=["']criclogo["'][^>]*src=["']([^"']+)["']/gi));
+      const logo1 = imgMatches[0]?.[1] || null;
+      const logo2 = imgMatches[1]?.[1] || null;
+
+      // Derive short codes (acronym from team names) as a fallback
+      const acronym = (name = '') => {
+        if (!name) return '';
+        const parts = name.replace(/[^A-Za-z0-9 ]+/g, '').split(/\s+/).filter(Boolean);
+        if (parts.length === 1) return parts[0].slice(0, 3).toUpperCase();
+        return parts.map(p => p[0]).slice(0,3).join('').toUpperCase();
+      };
+
+      if (team1) {
+        team1.logo = logo1;
+        team1.short = (team1.name && team1.name.length <= 4) ? team1.name.toUpperCase() : acronym(team1.name);
+      }
+      if (team2) {
+        team2.logo = logo2;
+        team2.short = (team2.name && team2.name.length <= 4) ? team2.name.toUpperCase() : acronym(team2.name);
+      }
 
       const isLive = !/won by|won|Full Time|FT|won/i.test(status) && /need|chasing|Live|\d+'/.test(raw) || /need|chasing|Live|\d+'/i.test(raw);
 

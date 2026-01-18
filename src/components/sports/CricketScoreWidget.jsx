@@ -107,10 +107,35 @@ const CricketScoreWidget = () => {
       <div ref={holderRef} className="slideholder overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-800" style={{height: 320}}>
         <div className="flex" style={{gap: 12}}>
           {matches.map((m) => (
-            <div key={m.id} className="slab p-4 bg-white dark:bg-slate-800 w-[280px] rounded-lg shadow-sm flex flex-col justify-between" style={{minWidth: 280}}>
+            <div key={m.id} className="slab p-4 bg-white dark:bg-slate-800 w-[280px] rounded-lg shadow-sm flex flex-col justify-between relative" style={{minWidth: 280}}>
               <div>
                 <div className="text-xs text-muted-foreground">{m.matchType?.toUpperCase()} • {m.date}</div>
-                <div className="text-sm font-semibold mt-2 truncate">{m.venue}</div>
+
+                {/* Top logos / short codes */}
+                <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center gap-2">
+                    {m.team1?.logo ? (
+                      <img src={m.team1.logo} alt={`${m.team1.name} logo`} className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold">{m.team1?.short}</div>
+                    )}
+                    <div className="text-sm font-semibold truncate">{m.team1?.name}</div>
+                  </div>
+
+                  <div className="text-center">
+                    <div className="w-6 h-6 bg-gray-100 dark:bg-slate-700 rounded-full flex items-center justify-center text-xs">v</div>
+                  </div>
+
+                  <div className="flex items-center gap-2 justify-end">
+                    <div className="text-sm font-semibold truncate text-right">{m.team2?.name}</div>
+                    {m.team2?.logo ? (
+                      <img src={m.team2.logo} alt={`${m.team2.name} logo`} className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold">{m.team2?.short}</div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="mt-2 text-sm text-gray-700 dark:text-gray-200">
                   <table className="w-full text-sm">
                     <tbody>
