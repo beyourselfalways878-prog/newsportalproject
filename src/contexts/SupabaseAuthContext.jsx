@@ -72,14 +72,49 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     let isMounted = true;
     
+    const tryRestoreFromLocal = async () => {
+      try {
+        const raw = localStorage.getItem('sb-24x7-auth');
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        // Known shape: { currentSession: { access_token, refresh_token } } or { session: { access_token, refresh_token } }
+        const possible = parsed.currentSession || parsed.session || parsed;
+        const access_token = possible?.access_token || possible?.accessToken || parsed?.accessToken;
+        const refresh_token = possible?.refresh_token || possible?.refreshToken || parsed?.refreshToken;
+        if (access_token && refresh_token) {
+          console.debug('Restoring session from localStorage fallback');
+          const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+          if (error) {
+            console.warn('Failed to set session from local storage:', error);
+            return null;
+          }
+          const { data: { session } } = await supabase.auth.getSession();
+          return session;
+        }
+      } catch (err) {
+        console.warn('Local session restore failed:', err);
+        return null;
+      }
+      return null;
+    };
+
     const getSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) {
           console.error('Error getting session:', error);
         }
+
+        let finalSession = session;
+
+        // If session is not returned, try restoring from localStorage (fallback)
+        if (!finalSession) {
+          finalSession = await tryRestoreFromLocal();
+          if (finalSession) console.debug('Session restored from local fallback');
+        }
+
         if (isMounted) {
-          await handleSession(session);
+          await handleSession(finalSession);
         }
       } catch (err) {
         console.error('Session fetch failed:', err);
@@ -90,6 +125,23 @@ export const AuthProvider = ({ children }) => {
     };
 
     getSession();
+
+    // Re-try session fetch on visibility change to handle refresh behaviors
+    const onVisibility = async () => {
+      if (document.visibilityState === 'visible') {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            const restored = await tryRestoreFromLocal();
+            await handleSession(restored);
+          }
+        } catch (err) {
+          console.error('Visibility session check failed:', err);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
 
     // Safety timeout - ensure loading is false after 5 seconds max
     const timeout = setTimeout(() => {

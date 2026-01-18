@@ -71,7 +71,7 @@ const HomePage = () => {
     }
   }, [listSelect]);
 
-  const fetchNews = useCallback(async ({ showLoader = true } = {}) => {
+  const fetchNews = useCallback(async ({ showLoader = true, retries = 2 } = {}) => {
     if (showLoader) setIsLoading(true);
 
     const from = 0;
@@ -91,11 +91,20 @@ const HomePage = () => {
 
       if (error) {
         console.error('Error fetching articles:', error);
+
+        // If PostgREST returns a 400 or transient error, retry a couple times
+        if (retries > 0) {
+          console.warn(`Retrying fetchNews (${retries} left)`);
+          await new Promise((r) => setTimeout(r, 1000));
+          return fetchNews({ showLoader, retries: retries - 1 });
+        }
+
         toast({
           title: 'Error Fetching News',
           description: error?.message || 'Could not load articles from the database.',
           variant: 'destructive',
         });
+        console.error('Full error object from supabase:', error);
         setFeaturedArticle(null);
         setArticles([]);
         setVisibleCount(10);
@@ -132,6 +141,11 @@ const HomePage = () => {
       if (showLoader) setIsLoading(false);
     } catch (err) {
       console.error('Unexpected error in fetchNews:', err);
+      // Retry for transient errors
+      if (retries > 0) {
+        await new Promise((r) => setTimeout(r, 1000));
+        return fetchNews({ showLoader, retries: retries - 1 });
+      }
       toast({
         title: 'Error Loading News',
         description: 'An unexpected error occurred while loading articles.',
