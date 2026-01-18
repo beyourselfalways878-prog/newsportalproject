@@ -19,7 +19,31 @@ const CricketScoreWidget = () => {
         const json = await res.json();
         if (!mounted) return;
 
-        // Enrich matches client-side if server didn't include logos/shorts
+        // Helper: sanitize vendor HTML (strip scripts, inline styles and event handlers)
+        const sanitizeHtml = (raw) => {
+          try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(raw || '', 'text/html');
+            // remove risky nodes
+            doc.querySelectorAll('script,iframe,form').forEach(n => n.remove());
+            // strip inline styles and event handlers, sanitize hrefs
+            doc.querySelectorAll('*').forEach(el => {
+              [...el.attributes].forEach(attr => {
+                const name = attr.name.toLowerCase();
+                const value = attr.value || '';
+                if (name.startsWith('on')) el.removeAttribute(attr.name);
+                if (name === 'style') el.removeAttribute('style');
+                if (name === 'href' && value.trim().toLowerCase().startsWith('javascript:')) el.removeAttribute('href');
+              });
+            });
+            // make links safe
+            doc.querySelectorAll('a').forEach(a => { a.setAttribute('target', '_blank'); a.setAttribute('rel', 'noreferrer noopener'); });
+            return doc.body.innerHTML || '';
+          } catch (e) {
+            return '';
+          }
+        };
+
         const deriveShort = (name) => {
           if (!name) return '';
           const parts = name.replace(/[^A-Za-z0-9 ]+/g, '').split(/\s+/).filter(Boolean);
@@ -42,6 +66,9 @@ const CricketScoreWidget = () => {
 
           if (!cleaned.team1.short) cleaned.team1.short = deriveShort(cleaned.team1.name);
           if (!cleaned.team2.short) cleaned.team2.short = deriveShort(cleaned.team2.name);
+
+          // sanitized HTML fallback (safe to insert)
+          cleaned.sanitizedHtml = sanitizeHtml(cleaned.rawHtml || '');
 
           return cleaned;
         });
@@ -131,31 +158,31 @@ const CricketScoreWidget = () => {
   }
 
   return (
-    <div className="w-full max-w-[320px] min-w-[280px]">
-      <div ref={holderRef} className="slideholder overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-800" style={{height: 320}}>
+    <div className="w-full max-w-[340px] min-w-[240px] sm:max-w-[320px]">
+      <div ref={holderRef} className="slideholder overflow-x-auto snap-x snap-mandatory rounded-xl border border-slate-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-800" style={{height: 320, WebkitOverflowScrolling: 'touch'}}>
         <div className="flex" style={{gap: 12}}>
           {matches.map((m) => (
-            <div key={m.id} className="slab p-4 bg-white dark:bg-slate-800 w-[280px] rounded-lg shadow-sm flex flex-col justify-between relative" style={{minWidth: 280}}>
+            <div key={m.id} className="slab snap-start p-3 sm:p-4 bg-white dark:bg-slate-800 w-[260px] sm:w-[300px] rounded-lg shadow-sm flex flex-col justify-between relative h-full" style={{minWidth: 260, boxSizing: 'border-box'}}>
               <div>
                 <div className="text-xs text-muted-foreground">{m.matchType?.toUpperCase()} • {m.date}</div>
 
                 {/* Top logos / short codes */}
                 <div className="flex items-center justify-between mt-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 overflow-hidden">
                     {m.team1?.logo ? (
                       <img src={m.team1.logo} alt={`${m.team1.name} logo`} className="w-8 h-8 rounded-full object-cover" />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold">{m.team1?.short}</div>
                     )}
-                    <div className="text-sm font-semibold truncate">{m.team1?.name}</div>
+                    <div className="text-sm font-semibold truncate max-w-[120px]">{m.team1?.name}</div>
                   </div>
 
                   <div className="text-center">
                     <div className="w-6 h-6 bg-gray-100 dark:bg-slate-700 rounded-full flex items-center justify-center text-xs">v</div>
                   </div>
 
-                  <div className="flex items-center gap-2 justify-end">
-                    <div className="text-sm font-semibold truncate text-right">{m.team2?.name}</div>
+                  <div className="flex items-center gap-2 justify-end overflow-hidden">
+                    <div className="text-sm font-semibold truncate text-right max-w-[120px]">{m.team2?.name}</div>
                     {m.team2?.logo ? (
                       <img src={m.team2.logo} alt={`${m.team2.name} logo`} className="w-8 h-8 rounded-full object-cover" />
                     ) : (
@@ -181,6 +208,11 @@ const CricketScoreWidget = () => {
                       )}
                     </tbody>
                   </table>
+
+                  {/* Safe vendor fallback HTML (sanitized) - hidden on very small screens */}
+                  {m.sanitizedHtml ? (
+                    <div className="raw-html-fallback mt-2 text-xs text-slate-500 hidden sm:block" style={{maxHeight: 64, overflow: 'auto'}} dangerouslySetInnerHTML={{ __html: m.sanitizedHtml }} />
+                  ) : null}
                 </div>
               </div>
 
