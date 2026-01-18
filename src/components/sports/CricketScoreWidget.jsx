@@ -47,15 +47,50 @@ const CricketScoreWidget = () => {
           }
         });
 
-        // Simple auto-rotate: advance slideWidth every 5s, pause on hover
+        // Enforce layout and sizes for slide elements (since original widget JS isn't executed)
         const slideHolder = container.querySelector('.slideholder');
         if (slideHolder) {
+          // Basic styles to ensure horizontal layout
+          slideHolder.style.display = 'flex';
+          slideHolder.style.overflowX = 'hidden';
+          slideHolder.style.scrollBehavior = 'smooth';
+
+          const stylize = () => {
+            const widgetWidth = Math.max(280, slideHolder.clientWidth);
+            const widgetHeight = Math.max(220, slideHolder.clientHeight);
+            Array.from(slideHolder.querySelectorAll('.slab')).forEach((s) => {
+              s.style.boxSizing = 'border-box';
+              s.style.flex = '0 0 auto';
+              s.style.width = (widgetWidth - 20) + 'px';
+              s.style.height = (widgetHeight - 20) + 'px';
+              Array.from(s.children).forEach((c) => {
+                if (c.style) {
+                  c.style.width = '100%';
+                  c.style.height = '100%';
+                }
+              });
+            });
+          };
+
+          stylize();
+
+          // Recalculate on resize
+          let ro = null;
+          try {
+            ro = new ResizeObserver(() => stylize());
+            ro.observe(slideHolder);
+            ro.observe(container);
+            window.addEventListener('resize', stylize);
+          } catch (e) {
+            window.addEventListener('resize', stylize);
+          }
+
           let paused = false;
           let intervalId = null;
 
           const doAdvance = () => {
             const w = slideHolder.clientWidth;
-            if ((slideHolder.scrollLeft + w) >= slideHolder.scrollWidth) {
+            if ((slideHolder.scrollLeft + w) >= slideHolder.scrollWidth - 2) {
               slideHolder.scrollLeft = 0;
             } else {
               slideHolder.scrollLeft = slideHolder.scrollLeft + w;
@@ -71,7 +106,7 @@ const CricketScoreWidget = () => {
 
           // Clean up if the widget updates
           const observer = new MutationObserver(() => {
-            // If the slides changed, reset scroll
+            stylize();
             slideHolder.scrollLeft = 0;
           });
           observer.observe(slideHolder, { childList: true, subtree: true });
@@ -80,6 +115,10 @@ const CricketScoreWidget = () => {
           container._cricCleanup = () => {
             clearInterval(intervalId);
             observer.disconnect();
+            try {
+              if (ro) ro.disconnect();
+            } catch (e) {}
+            window.removeEventListener('resize', stylize);
           };
         }
       } catch (err) {
