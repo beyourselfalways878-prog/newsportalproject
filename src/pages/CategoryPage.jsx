@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Helmet } from 'react-helmet-async';
-import { toast } from '@/components/ui/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import Sidebar from '@/components/layout/Sidebar';
@@ -12,13 +12,14 @@ import ArticleUploader from '@/components/admin/ArticleUploader.jsx';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2 } from 'lucide-react';
 import { contentData } from '@/lib/data';
-import { supabase } from '@/lib/customSupabaseClient.js';
-import { useAuth } from '@/contexts/SupabaseAuthContext.jsx';
+import { fetchArticles, fetchTrendingTopics } from '@/lib/db.js';
+import { useAuth } from '@/contexts/AuthContext.jsx';
 
 const CategoryPage = () => {
   const { categoryKey } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const language = 'hi';
   const [darkMode, setDarkMode] = useState(false);
   const [email, setEmail] = useState('');
@@ -39,79 +40,66 @@ const CategoryPage = () => {
 
   const ARTICLES_CACHE_KEY = `category:${language}:${categoryKey || 'all'}:articles:v1`;
   const TRENDING_CACHE_KEY = `category:${language}:trending:v1`;
-  const CACHE_TTL_MS = 1000 * 60 * 3; // 3 minutes
-
-  const listSelect =
-    'id,title_hi,excerpt_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,video_url';
+  const CACHE_TTL_MS = 1000 * 60 * 3;
 
   const fetchNews = useCallback(async ({ showLoader = true } = {}) => {
     if (showLoader) setIsLoading(true);
-    const from = 0;
-    const to = INITIAL_FETCH_SIZE - 1;
 
-    let query = supabase
-      .from('articles')
-      .select(listSelect)
-      .order('published_at', { ascending: false })
-      .range(from, to);
-    if (categoryKey) {
-      query = query.eq('category', categoryKey);
-    }
+    try {
+      const data = await fetchArticles({ category: categoryKey, limit: INITIAL_FETCH_SIZE });
 
-    const { data, error } = await query;
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid response format');
+      }
 
-    if (error) {
-      console.error('Error fetching articles:', error);
-      toast({
-        title: 'Error Fetching News',
-        description: error?.message || 'Could not load articles for this category.',
-        variant: 'destructive',
-      });
-      setArticles([]);
-    } else {
       setArticles(data);
       setVisibleCount(10);
       setNextFrom(data?.length || 0);
       setHasMore((data?.length || 0) === INITIAL_FETCH_SIZE);
 
       try {
-        sessionStorage.setItem(ARTICLES_CACHE_KEY, JSON.stringify({ ts: Date.now(), articles: data, nextFrom: data?.length || 0, hasMore: (data?.length || 0) === INITIAL_FETCH_SIZE }));
+        sessionStorage.setItem(
+          ARTICLES_CACHE_KEY,
+          JSON.stringify({ ts: Date.now(), articles: data, nextFrom: data?.length || 0, hasMore: (data?.length || 0) === INITIAL_FETCH_SIZE })
+        );
       } catch {
         // ignore cache write issues
       }
+
+      if (showLoader) setIsLoading(false);
+    } catch (err) {
+      console.error('Error fetching articles:', err);
+      toast({
+        title: 'Error Fetching News',
+        description: err?.message || 'Could not load articles for this category.',
+        variant: 'destructive',
+      });
+      setArticles([]);
+      setVisibleCount(10);
+      setNextFrom(0);
+      setHasMore(false);
+      if (showLoader) setIsLoading(false);
     }
-    if (showLoader) setIsLoading(false);
-  }, [ARTICLES_CACHE_KEY, INITIAL_FETCH_SIZE, categoryKey, listSelect]);
+  }, [ARTICLES_CACHE_KEY, INITIAL_FETCH_SIZE, categoryKey, toast]);
 
   const fetchMoreNews = useCallback(async () => {
     if (isLoadingMore || !hasMore) return;
 
     setIsLoadingMore(true);
     const from = nextFrom;
-    const to = from + LOAD_MORE_SIZE - 1;
 
-    let query = supabase
-      .from('articles')
-      .select(listSelect)
-      .order('published_at', { ascending: false })
-      .range(from, to);
-    if (categoryKey) {
-      query = query.eq('category', categoryKey);
-    }
-
-    const { data, error } = await query;
-    if (error) {
+    try {
+      const data = await fetchArticles({ category: categoryKey, limit: LOAD_MORE_SIZE, offset: from });
+      setArticles((prev) => [...prev, ...data]);
+      setNextFrom(from + (data?.length || 0));
+      setHasMore((data?.length || 0) === LOAD_MORE_SIZE);
+    } catch (error) {
       console.error('Error fetching more articles:', error);
       setHasMore(false);
+    } finally {
       setIsLoadingMore(false);
-      return;
     }
-
-    setArticles((prev) => [...prev, ...(data || [])]);
-    setNextFrom(from + (data?.length || 0));
-    setHasMore((data?.length || 0) === LOAD_MORE_SIZE);
-    setIsLoadingMore(false);
-  }, [LOAD_MORE_SIZE, categoryKey, hasMore, isLoadingMore, listSelect, nextFrom]);
+  }, [LOAD_MORE_SIZE, categoryKey, hasMore, isLoadingMore, nextFrom]);
 
   const handleLoadMore = async () => {
     const target = visibleCount + LOAD_MORE_SIZE;
@@ -128,50 +116,66 @@ const CategoryPage = () => {
     document.documentElement.classList.toggle('dark', savedTheme === 'dark');
     document.documentElement.lang = 'hi';
 
-    try {
-      const cached = JSON.parse(sessionStorage.getItem(ARTICLES_CACHE_KEY) || 'null');
-      if (cached?.ts && Array.isArray(cached?.articles) && Date.now() - cached.ts < CACHE_TTL_MS) {
-        setArticles(cached.articles);
-        setVisibleCount(10);
-        setNextFrom(typeof cached.nextFrom === 'number' ? cached.nextFrom : cached.articles.length);
-        setHasMore(!!cached.hasMore);
-        setIsLoading(false);
-        fetchNews({ showLoader: false });
-      } else {
-        fetchNews({ showLoader: true });
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        const cached = JSON.parse(sessionStorage.getItem(ARTICLES_CACHE_KEY) || 'null');
+        if (cached?.ts && Array.isArray(cached?.articles) && Date.now() - cached.ts < CACHE_TTL_MS) {
+          if (isMounted) {
+            setArticles(cached.articles);
+            setVisibleCount(10);
+            setNextFrom(typeof cached.nextFrom === 'number' ? cached.nextFrom : cached.articles.length);
+            setHasMore(!!cached.hasMore);
+            setIsLoading(false);
+          }
+          fetchNews({ showLoader: false });
+        } else {
+          await fetchNews({ showLoader: true });
+        }
+      } catch {
+        await fetchNews({ showLoader: true });
       }
-    } catch {
-      fetchNews({ showLoader: true });
-    }
 
-    fetchTrendingTopics();
-  }, [fetchNews]);
+      loadTrendingTopics();
+    };
 
-  const fetchTrendingTopics = async () => {
+    loadData();
+
+    const timeout = setTimeout(() => {
+      if (isMounted) {
+        setIsLoading(false);
+      }
+    }, 10000);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeout);
+    };
+  }, [ARTICLES_CACHE_KEY, CACHE_TTL_MS, INITIAL_FETCH_SIZE, fetchNews]);
+
+  const loadTrendingTopics = async () => {
     try {
       const cached = JSON.parse(sessionStorage.getItem(TRENDING_CACHE_KEY) || 'null');
       if (cached?.ts && Array.isArray(cached?.data) && Date.now() - cached.ts < CACHE_TTL_MS) {
         setTrendingDbTopics(cached.data);
+        return;
       }
     } catch {
       // ignore cache read issues
     }
 
-    const { data, error } = await supabase
-      .from('trending_topics')
-      .select('name_hi,rank')
-      .order('rank', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching trending topics:', error);
-    } else {
-      setTrendingDbTopics(data);
+    try {
+      const data = await fetchTrendingTopics();
+      setTrendingDbTopics(data || []);
 
       try {
         sessionStorage.setItem(TRENDING_CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
       } catch {
         // ignore cache write issues
       }
+    } catch (error) {
+      console.error('Error fetching trending topics:', error);
     }
   };
 
@@ -185,19 +189,28 @@ const CategoryPage = () => {
   const handleSubscribe = async (e) => {
     e.preventDefault();
     if (email) {
-      const { error } = await supabase.from('subscribers').insert([{ email, language }]);
-      if (error) {
-        toast({
-          title: 'Subscription Failed',
-          description: error.message,
-          variant: 'destructive',
+      try {
+        const response = await fetch('/api/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, language }),
         });
-      } else {
+
+        if (!response.ok) {
+          throw new Error('Subscription failed');
+        }
+
         toast({
           title: 'Subscribed!',
           description: 'You have been added to our newsletter.',
         });
         setEmail('');
+      } catch (error) {
+        toast({
+          title: 'Subscription Failed',
+          description: error.message,
+          variant: 'destructive',
+        });
       }
     }
   };
@@ -219,14 +232,14 @@ const CategoryPage = () => {
   };
 
   const handleUploadClick = () => {
-    if (user?.email === 'pushkarraj207@gmail.com') {
+    if (user?.role === 'admin') {
       setIsUploaderOpen(true);
     } else {
       toast({
         title: 'Admin Access Required',
         description: 'Please log in as an admin to upload content.',
       });
-      if(!user) {
+      if (!user) {
         setIsAuthModalOpen(true);
       }
     }
@@ -234,11 +247,11 @@ const CategoryPage = () => {
 
   const handleLoginClick = () => {
     setIsAuthModalOpen(true);
-  }
+  };
 
   const handleUploadSuccess = () => {
     setIsUploaderOpen(false);
-    fetchNews(); // Refresh news after upload
+    fetchNews();
   };
 
   const currentContent = contentData[language];
@@ -274,7 +287,7 @@ const CategoryPage = () => {
       return (
         <div className="bg-card/70 backdrop-blur-md rounded-xl shadow-xl p-6 sm:p-8 border border-white/10">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground">
-            {categoryName}
+            {currentContent.categories[categoryKey] || 'श्रेणी'}
           </h2>
           <p className="mt-2 text-sm sm:text-base text-muted-foreground">
             इस श्रेणी में अभी कोई लेख उपलब्ध नहीं है। आप नीचे दी गई श्रेणियां देख सकते हैं — हम जल्द ही यहां भी लेख जोड़ेंगे।
@@ -319,7 +332,7 @@ const CategoryPage = () => {
   const pageTitle = `${categoryName} | ${currentContent.siteName}`;
   const pageDescription = `${categoryName} की ताज़ा ख़बरें और अपडेट्स।`;
   const canonicalUrl = `${baseUrl}/category/${categoryKey}`;
-  const canUpload = user?.email === 'pushkarraj207@gmail.com';
+  const canUpload = user?.role === 'admin';
 
   return (
     <>
@@ -361,7 +374,7 @@ const CategoryPage = () => {
         </div>
       </div>
 
-      <Footer currentContent={currentContent} onNavigate={() => {}} onSelectCategory={handleCategorySelect} />
+      <Footer currentContent={currentContent} onNavigate={() => { }} onSelectCategory={handleCategorySelect} />
 
       <AuthModal isOpen={isAuthModalOpen} setIsOpen={setIsAuthModalOpen} />
 

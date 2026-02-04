@@ -8,8 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
-import { useAuth } from '@/contexts/SupabaseAuthContext.jsx';
-import { supabase } from '@/lib/customSupabaseClient.js';
+import { useAuth } from '@/contexts/AuthContext.jsx';
+import { createArticle, uploadImage } from '@/lib/db.js';
 import { contentData } from '@/lib/data.js';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
@@ -58,7 +58,7 @@ const detectCategory = (text) => {
   const lowerText = text.toLowerCase();
   let maxScore = 0;
   let detectedCategory = 'indian';
-  
+
   for (const [category, keywords] of Object.entries(categoryKeywords)) {
     const score = keywords.filter(kw => lowerText.includes(kw.toLowerCase())).length;
     if (score > maxScore) {
@@ -73,13 +73,13 @@ const detectCategory = (text) => {
 const extractTitle = (html) => {
   const h1Match = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
   if (h1Match) return h1Match[1].replace(/<[^>]*>/g, '').trim();
-  
+
   const h2Match = html.match(/<h2[^>]*>(.*?)<\/h2>/i);
   if (h2Match) return h2Match[1].replace(/<[^>]*>/g, '').trim();
-  
+
   const strongMatch = html.match(/<strong[^>]*>(.*?)<\/strong>/i);
   if (strongMatch) return strongMatch[1].replace(/<[^>]*>/g, '').trim();
-  
+
   const firstP = html.match(/<p[^>]*>(.*?)<\/p>/i);
   if (firstP) {
     const text = firstP[1].replace(/<[^>]*>/g, '').trim();
@@ -106,8 +106,8 @@ const ArticleUploaderPage = () => {
   const [searchParams] = useSearchParams();
   const articleId = searchParams.get('id');
   const articleFromState = location.state?.article;
-  const { user, profile } = useAuth();
-  
+  const { user, profile, token } = useAuth();
+
   const [currentStep, setCurrentStep] = useState((articleId || articleFromState) ? 2 : 1); // 1: Upload, 2: Review, 3: Published
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(!!articleId);
@@ -127,10 +127,10 @@ const ArticleUploaderPage = () => {
   const { toast } = useToast();
   const language = 'hi';
   const currentContent = contentData[language];
-  
+
   const categories = Object.entries(currentContent.categories).filter(([key]) => key !== 'all');
 
-  const formatSupabaseError = (err) => {
+  const formatError = (err) => {
     if (!err) return 'Unknown error';
     if (typeof err === 'string') return err;
     const parts = [err.message, err.details, err.hint, err.code].filter(Boolean);
@@ -158,14 +158,13 @@ const ArticleUploaderPage = () => {
       } else if (articleId) {
         // Article ID from URL parameters
         try {
-          const { data, error } = await supabase
-            .from('articles')
-            .select('*')
-            .eq('id', articleId)
-            .single();
-
-          if (error) throw error;
-          articleToLoad = data;
+          const response = await fetch(`/api/articles/${articleId}`);
+          const json = await response.json();
+          if (json.success) {
+            articleToLoad = json.data;
+          } else {
+            throw new Error(json.error);
+          }
         } catch (error) {
           console.error('Error loading article:', error);
           toast({
@@ -219,58 +218,14 @@ const ArticleUploaderPage = () => {
 
   // Ensure a minimal profile row exists in the DB so RLS/storage policies allow uploads/inserts.
   const ensureProfileExists = async () => {
+    // Mock implementation or replace with API call if needed
+    // With Firebase / API approach, profile creation is handled at registration.
+    // We can just check local auth state.
     if (!user) {
       toast({ title: 'Login required', description: 'Please sign in to upload articles', variant: 'destructive' });
       return false;
     }
-    try {
-      const { data: existingProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, role')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error('Error checking profile existence:', profileError);
-        toast({ variant: 'destructive', title: 'Profile check failed', description: formatSupabaseError(profileError) });
-        return false;
-      }
-
-      // If profile exists, ensure it has admin privileges
-      if (existingProfile) {
-        const existingRole = existingProfile.role ? String(existingProfile.role).toLowerCase() : null;
-        if (existingRole === 'admin' || existingRole === 'superuser') {
-          return true;
-        }
-        toast({ title: 'Insufficient privileges', description: 'Your account does not have admin privileges in the database. Please request admin access.', variant: 'destructive' });
-        return false;
-      }
-
-      // No profile row exists; try to create one only if the auth metadata indicates admin/superuser
-      const roleFromMetadata = user?.user_metadata?.role || user?.app_metadata?.role || profile?.role;
-      const normalizedRole = roleFromMetadata ? String(roleFromMetadata).toLowerCase() : null;
-
-      // If the user is not admin/superuser according to metadata, do not proceed with uploads/inserts.
-      if (!(normalizedRole === 'admin' || normalizedRole === 'superuser')) {
-        toast({ title: 'Insufficient privileges', description: 'Your account does not have admin privileges in the database. Please request admin access.', variant: 'destructive' });
-        return false;
-      }
-
-      const { error: insertError } = await supabase
-        .from('profiles')
-        .insert([{ id: user.id, full_name: profile?.full_name || user.email, role: normalizedRole }]);
-      if (insertError) {
-        console.error('Error creating profile row:', insertError);
-        toast({ variant: 'destructive', title: 'Profile creation failed', description: formatSupabaseError(insertError) });
-        return false;
-      }
-      console.log('Created missing profile row for user', user.id);
-      return true;
-    } catch (err) {
-      console.error('Ensure profile failed:', err);
-      toast({ variant: 'destructive', title: 'Profile creation failed', description: err.message || 'Could not verify profile' });
-      return false;
-    }
+    return true;
   };
 
   const handleFileChange = async (event) => {
@@ -290,7 +245,7 @@ const ArticleUploaderPage = () => {
     try {
       const mammoth = await getMammoth();
       const uploadedImages = [];
-      
+
       const options = {
         transformDocument: mammoth.transforms.paragraph((paragraph) => {
           let newChildren = [];
@@ -330,37 +285,28 @@ const ArticleUploaderPage = () => {
         convertImage: mammoth.images.imgElement(async (image) => {
           const imageBuffer = await image.read("base64");
           const blob = dataURItoBlob(`data:${image.contentType};base64,${imageBuffer}`);
-          const fileName = `articles/${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+          // Mock file object for uploadImage function
+          const file = new File([blob], `image-${Date.now()}.png`, { type: image.contentType });
 
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('article-images')
-            .upload(fileName, blob, { contentType: image.contentType });
+          const response = await uploadImage(file, token); // Use API
 
-          if (uploadError) {
-            throw new Error(`Image upload failed: ${uploadError.message}`);
-          }
-
-          const { data: urlData } = supabase.storage
-            .from('article-images')
-            .getPublicUrl(uploadData.path);
-
-          uploadedImages.push(urlData.publicUrl);
-          return { src: urlData.publicUrl };
+          uploadedImages.push(response.url);
+          return { src: response.url };
         })
       };
 
       const { value: html } = await mammoth.convert({ arrayBuffer: await file.arrayBuffer() }, options);
-      
+
       // Extract all data from the document
       const extractedTitle = extractTitle(html);
       const extractedExcerpt = extractExcerpt(html, extractedTitle);
       const detectedCategory = detectCategory(html);
       const keywords = extractKeywords(html);
       const firstImageUrl = uploadedImages[0] || html.match(/<img src="(.*?)"/)?.[1] || '';
-      
+
       // Store extracted images
       setExtractedImages(uploadedImages);
-      
+
       // Auto-fill all fields
       setContentHtml(html);
       setFeaturedImageUrl(firstImageUrl);
@@ -376,10 +322,10 @@ const ArticleUploaderPage = () => {
 
       // Move to review step
       setCurrentStep(2);
-      
-      toast({ 
-        title: '✨ स्मार्ट एक्सट्रैक्शन पूर्ण!', 
-        description: `शीर्षक, अंश, ${uploadedImages.length} छवियां, और SEO कीवर्ड स्वचालित रूप से भरे गए।` 
+
+      toast({
+        title: '✨ स्मार्ट एक्सट्रैक्शन पूर्ण!',
+        description: `शीर्षक, अंश, ${uploadedImages.length} छवियां, और SEO कीवर्ड स्वचालित रूप से भरे गए।`
       });
     } catch (error) {
       console.error('Error processing file:', error);
@@ -417,16 +363,15 @@ const ArticleUploaderPage = () => {
     }
 
     setIsProcessing(true);
-n    // Ensure profile exists so RLS and storage policies allow the uploads/inserts
+    n    // Ensure profile exists so RLS and storage policies allow the uploads/inserts
     const profileOk = await ensureProfileExists();
     if (!profileOk) {
       setIsProcessing(false);
       return;
     }
 
-n    // Temporarily skip role check for testing
-    // const { data: sessionData } = await supabase.auth.getSession();
-    // if (!sessionData?.session) {
+    // Temporarily skip role check for testing
+    // if (!token) {
     //   toast({ title: 'Login required', description: 'Your session has expired. Please log in again.', variant: 'destructive' });
     //   setIsProcessing(false);
     //   return;
@@ -435,18 +380,14 @@ n    // Temporarily skip role check for testing
     let finalImageUrl = articleData.id ? featuredImageUrl : featuredImageUrl;
 
     if (featuredImageFile) {
-      const fileName = `featured/${Date.now()}-${featuredImageFile.name}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('article-images')
-        .upload(fileName, featuredImageFile, { upsert: !!articleData.id });
-
-      if (uploadError) {
+      try {
+        const response = await uploadImage(featuredImageFile, token);
+        finalImageUrl = response.url;
+      } catch (uploadError) {
         toast({ title: "Image Upload Error", description: uploadError.message, variant: "destructive" });
         setIsProcessing(false);
         return;
       }
-      const { data: urlData } = supabase.storage.from('article-images').getPublicUrl(uploadData.path);
-      finalImageUrl = urlData.publicUrl;
     }
 
     try {
@@ -454,26 +395,18 @@ n    // Temporarily skip role check for testing
         ...articleData,
         content_hi: contentHtml,
         image_url: finalImageUrl,
-        published_at: articleData.id ? articleData.published_at : new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       };
 
-      delete finalData.created_at;
-
       console.log('Final data to save:', finalData);
-      // Use insert for new articles, upsert for updates (pass arrays to be explicit)
-      const operation = articleData.id ? 'upsert' : 'insert';
-      const res = articleData.id 
-        ? await supabase.from('articles').upsert([finalData])
-        : await supabase.from('articles').insert([finalData]);
-      console.log(`${operation} result:`, res);
-      if (res.error) throw res.error;
+
+      const res = await createArticle(finalData, token);
+      console.log(`Create result:`, res);
 
       toast({ title: articleData.id ? 'Article Updated!' : 'Article Published!' });
       navigate('/dashboard');
     } catch (error) {
       console.error('Error saving article:', error);
-      toast({ variant: 'destructive', title: 'Save Failed', description: formatSupabaseError(error) });
+      toast({ variant: 'destructive', title: 'Save Failed', description: error.message });
     } finally {
       setIsProcessing(false);
     }
@@ -519,11 +452,11 @@ n    // Temporarily skip role check for testing
           </p>
         </div>
 
-        <label 
-          htmlFor="docx-upload-main" 
+        <label
+          htmlFor="docx-upload-main"
           className={`block w-full p-8 rounded-2xl border-2 border-dashed transition-all cursor-pointer
-            ${isProcessing 
-              ? 'border-primary bg-primary/5 cursor-wait' 
+            ${isProcessing
+              ? 'border-primary bg-primary/5 cursor-wait'
               : 'border-gray-300 dark:border-gray-600 hover:border-primary hover:bg-primary/5'
             }`}
         >
@@ -553,13 +486,13 @@ n    // Temporarily skip role check for testing
               </div>
             </div>
           )}
-          <input 
-            id="docx-upload-main" 
-            type="file" 
-            className="sr-only" 
-            accept=".docx" 
-            onChange={handleFileChange} 
-            disabled={isProcessing} 
+          <input
+            id="docx-upload-main"
+            type="file"
+            className="sr-only"
+            accept=".docx"
+            onChange={handleFileChange}
+            disabled={isProcessing}
           />
         </label>
 
@@ -589,22 +522,22 @@ n    // Temporarily skip role check for testing
       <Helmet>
         <title>{articleId ? 'Edit Article' : 'New Article'} | 24x7 Indian News</title>
       </Helmet>
-      
-      <Header 
-        currentContent={currentContent} 
-        language={language} 
-        darkMode={false} 
-        toggleDarkMode={() => {}} 
-        onLogoClick={handleBackToHome} 
+
+      <Header
+        currentContent={currentContent}
+        language={language}
+        darkMode={false}
+        toggleDarkMode={() => { }}
+        onLogoClick={handleBackToHome}
       />
-      
+
       <main className="container mx-auto px-4 py-6 md:py-8">
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 md:mb-8">
           <div className="flex items-center gap-3">
-            <Button 
-              variant="outline" 
-              size="icon" 
+            <Button
+              variant="outline"
+              size="icon"
               onClick={currentStep === 1 ? handleCancel : handleBackToUpload}
               className="shrink-0"
             >
@@ -619,12 +552,12 @@ n    // Temporarily skip role check for testing
               </p>
             </div>
           </div>
-          
+
           {currentStep === 2 && (
             <div className="flex gap-2 sm:gap-3">
-              <Button 
-                variant="outline" 
-                onClick={handleCancel} 
+              <Button
+                variant="outline"
+                onClick={handleCancel}
                 disabled={isProcessing}
                 className="flex-1 sm:flex-none"
               >
@@ -632,8 +565,8 @@ n    // Temporarily skip role check for testing
                 <span className="hidden sm:inline">रद्द करें</span>
                 <span className="sm:hidden">Cancel</span>
               </Button>
-              <Button 
-                onClick={handleSave} 
+              <Button
+                onClick={handleSave}
                 disabled={isProcessing || !articleData.title_hi}
                 className="flex-1 sm:flex-none"
               >
@@ -671,232 +604,232 @@ n    // Temporarily skip role check for testing
             )}
 
             <div className="p-4 md:p-6 lg:p-8 space-y-6 md:space-y-8">
-            
-            {/* Basic Info Section */}
-            <section>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">
-                मूल जानकारी (Basic Info)
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                <div className="md:col-span-2">
-                  <Label htmlFor="title_hi" className="text-sm font-medium">शीर्षक (Title) *</Label>
-                  <Input 
-                    id="title_hi" 
-                    value={articleData.title_hi || ''} 
-                    onChange={handleInputChange} 
-                    required 
-                    className="mt-1.5"
-                    placeholder="लेख का शीर्षक दर्ज करें"
-                  />
+
+              {/* Basic Info Section */}
+              <section>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">
+                  मूल जानकारी (Basic Info)
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                  <div className="md:col-span-2">
+                    <Label htmlFor="title_hi" className="text-sm font-medium">शीर्षक (Title) *</Label>
+                    <Input
+                      id="title_hi"
+                      value={articleData.title_hi || ''}
+                      onChange={handleInputChange}
+                      required
+                      className="mt-1.5"
+                      placeholder="लेख का शीर्षक दर्ज करें"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label htmlFor="excerpt_hi" className="text-sm font-medium">अंश (Excerpt)</Label>
+                    <Textarea
+                      id="excerpt_hi"
+                      value={articleData.excerpt_hi || ''}
+                      onChange={handleInputChange}
+                      className="mt-1.5 min-h-[80px]"
+                      placeholder="लेख का संक्षिप्त विवरण"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="category" className="text-sm font-medium">श्रेणी (Category)</Label>
+                    <Select onValueChange={handleCategoryChange} value={articleData.category || 'indian'}>
+                      <SelectTrigger id="category" className="mt-1.5 bg-white dark:bg-gray-800">
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg max-h-60">
+                        {categories.map(([key, value]) => (
+                          <SelectItem key={key} value={key} className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
+                            {value}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="author" className="text-sm font-medium">लेखक (Author)</Label>
+                    <Input
+                      id="author"
+                      value={articleData.author || ''}
+                      onChange={handleInputChange}
+                      className="mt-1.5"
+                      placeholder="लेखक का नाम"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="location" className="text-sm font-medium">स्थान (Location)</Label>
+                    <Input
+                      id="location"
+                      value={articleData.location || ''}
+                      onChange={handleInputChange}
+                      className="mt-1.5"
+                      placeholder="समाचार का स्थान"
+                    />
+                  </div>
+                  <div className="flex items-center h-full pt-6">
+                    <div className="flex items-center space-x-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                      <Checkbox
+                        id="is_breaking"
+                        checked={articleData.is_breaking}
+                        onCheckedChange={handleCheckboxChange}
+                      />
+                      <Label htmlFor="is_breaking" className="flex items-center gap-2 text-sm font-medium text-orange-600 dark:text-orange-400 cursor-pointer">
+                        <Zap className="h-4 w-4" /> ब्रेकिंग न्यूज़
+                      </Label>
+                    </div>
+                  </div>
                 </div>
-                <div className="md:col-span-2">
-                  <Label htmlFor="excerpt_hi" className="text-sm font-medium">अंश (Excerpt)</Label>
-                  <Textarea 
-                    id="excerpt_hi" 
-                    value={articleData.excerpt_hi || ''} 
-                    onChange={handleInputChange} 
-                    className="mt-1.5 min-h-[80px]"
-                    placeholder="लेख का संक्षिप्त विवरण"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="category" className="text-sm font-medium">श्रेणी (Category)</Label>
-                  <Select onValueChange={handleCategoryChange} value={articleData.category || 'indian'}>
-                    <SelectTrigger id="category" className="mt-1.5 bg-white dark:bg-gray-800">
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg max-h-60">
-                      {categories.map(([key, value]) => (
-                        <SelectItem key={key} value={key} className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                          {value}
-                        </SelectItem>
+              </section>
+
+              {/* Media Section */}
+              <section>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">
+                  मीडिया (Media)
+                </h2>
+
+                {/* Extracted Images Gallery */}
+                {extractedImages.length > 0 && (
+                  <div className="mb-6">
+                    <Label className="text-sm font-medium mb-3 block">डॉक्यूमेंट से निकाली गई छवियां (Extracted Images) - क्लिक करके फीचर्ड इमेज चुनें</Label>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                      {extractedImages.map((imgUrl, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setFeaturedImageUrl(imgUrl)}
+                          className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105
+                          ${featuredImageUrl === imgUrl
+                              ? 'border-primary ring-2 ring-primary ring-offset-2'
+                              : 'border-gray-200 dark:border-gray-700 hover:border-primary/50'
+                            }`}
+                        >
+                          <img src={imgUrl} alt={`Extracted ${idx + 1}`} className="w-full h-full object-cover" />
+                          {featuredImageUrl === imgUrl && (
+                            <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                              <CheckCircle2 className="h-6 w-6 text-white drop-shadow-lg" />
+                            </div>
+                          )}
+                        </button>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="author" className="text-sm font-medium">लेखक (Author)</Label>
-                  <Input 
-                    id="author" 
-                    value={articleData.author || ''} 
-                    onChange={handleInputChange} 
-                    className="mt-1.5"
-                    placeholder="लेखक का नाम"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="location" className="text-sm font-medium">स्थान (Location)</Label>
-                  <Input 
-                    id="location" 
-                    value={articleData.location || ''} 
-                    onChange={handleInputChange} 
-                    className="mt-1.5"
-                    placeholder="समाचार का स्थान"
-                  />
-                </div>
-                <div className="flex items-center h-full pt-6">
-                  <div className="flex items-center space-x-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
-                    <Checkbox 
-                      id="is_breaking" 
-                      checked={articleData.is_breaking} 
-                      onCheckedChange={handleCheckboxChange} 
-                    />
-                    <Label htmlFor="is_breaking" className="flex items-center gap-2 text-sm font-medium text-orange-600 dark:text-orange-400 cursor-pointer">
-                      <Zap className="h-4 w-4" /> ब्रेकिंग न्यूज़
-                    </Label>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </section>
+                )}
 
-            {/* Media Section */}
-            <section>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">
-                मीडिया (Media)
-              </h2>
-              
-              {/* Extracted Images Gallery */}
-              {extractedImages.length > 0 && (
-                <div className="mb-6">
-                  <Label className="text-sm font-medium mb-3 block">डॉक्यूमेंट से निकाली गई छवियां (Extracted Images) - क्लिक करके फीचर्ड इमेज चुनें</Label>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                    {extractedImages.map((imgUrl, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setFeaturedImageUrl(imgUrl)}
-                        className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105
-                          ${featuredImageUrl === imgUrl 
-                            ? 'border-primary ring-2 ring-primary ring-offset-2' 
-                            : 'border-gray-200 dark:border-gray-700 hover:border-primary/50'
-                          }`}
-                      >
-                        <img src={imgUrl} alt={`Extracted ${idx + 1}`} className="w-full h-full object-cover" />
-                        {featuredImageUrl === imgUrl && (
-                          <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                            <CheckCircle2 className="h-6 w-6 text-white drop-shadow-lg" />
-                          </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Featured Image */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">फीचर्ड इमेज (Featured Image)</Label>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                      <div className="w-full sm:w-32 h-32 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300 dark:border-gray-600">
+                        {featuredImageUrl ? (
+                          <img src={featuredImageUrl} alt="Featured preview" className="w-full h-full object-cover" />
+                        ) : (
+                          <ImageIcon className="h-10 w-10 text-gray-400" />
                         )}
-                      </button>
-                    ))}
+                      </div>
+                      <div className="flex-1 w-full sm:w-auto">
+                        <label htmlFor="featured-image-upload" className="cursor-pointer inline-flex items-center justify-center w-full sm:w-auto rounded-lg bg-primary text-primary-foreground text-sm font-medium px-4 py-2.5 hover:bg-primary/90 transition-colors">
+                          <ImageIcon className="h-4 w-4 mr-2" />
+                          छवि चुनें
+                          <input id="featured-image-upload" type="file" className="sr-only" accept="image/*" onChange={handleFeaturedImageChange} />
+                        </label>
+                        <p className="text-xs text-gray-500 mt-2">PNG, JPG, WebP (Max 5MB)</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Featured Image */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">फीचर्ड इमेज (Featured Image)</Label>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                    <div className="w-full sm:w-32 h-32 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300 dark:border-gray-600">
-                      {featuredImageUrl ? (
-                        <img src={featuredImageUrl} alt="Featured preview" className="w-full h-full object-cover" />
-                      ) : (
-                        <ImageIcon className="h-10 w-10 text-gray-400" />
-                      )}
-                    </div>
-                    <div className="flex-1 w-full sm:w-auto">
-                      <label htmlFor="featured-image-upload" className="cursor-pointer inline-flex items-center justify-center w-full sm:w-auto rounded-lg bg-primary text-primary-foreground text-sm font-medium px-4 py-2.5 hover:bg-primary/90 transition-colors">
-                        <ImageIcon className="h-4 w-4 mr-2" />
-                        छवि चुनें
-                        <input id="featured-image-upload" type="file" className="sr-only" accept="image/*" onChange={handleFeaturedImageChange} />
-                      </label>
-                      <p className="text-xs text-gray-500 mt-2">PNG, JPG, WebP (Max 5MB)</p>
-                    </div>
+                  {/* Re-import DOCX */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">नई .docx फ़ाइल अपलोड करें</Label>
+                    <label htmlFor="docx-upload" className="flex flex-col items-center justify-center w-full h-32 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 cursor-pointer hover:border-primary hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                      <FileText className="h-10 w-10 text-gray-400 mb-2" />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">दूसरी फ़ाइल अपलोड करें</span>
+                      <span className="text-xs text-gray-500 mt-1">DOCX (Max 10MB)</span>
+                      <input id="docx-upload" type="file" className="sr-only" accept=".docx" onChange={handleFileChange} disabled={isProcessing} />
+                    </label>
                   </div>
                 </div>
 
-                {/* Re-import DOCX */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">नई .docx फ़ाइल अपलोड करें</Label>
-                  <label htmlFor="docx-upload" className="flex flex-col items-center justify-center w-full h-32 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 cursor-pointer hover:border-primary hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                    <FileText className="h-10 w-10 text-gray-400 mb-2" />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">दूसरी फ़ाइल अपलोड करें</span>
-                    <span className="text-xs text-gray-500 mt-1">DOCX (Max 10MB)</span>
-                    <input id="docx-upload" type="file" className="sr-only" accept=".docx" onChange={handleFileChange} disabled={isProcessing} />
-                  </label>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <Label htmlFor="image_alt_text_hi" className="text-sm font-medium">छवि ऑल्ट टेक्स्ट (Image Alt Text)</Label>
-                <Input 
-                  id="image_alt_text_hi" 
-                  value={articleData.image_alt_text_hi || ''} 
-                  onChange={handleInputChange} 
-                  placeholder="उदा., प्रधानमंत्री भाषण देते हुए"
-                  className="mt-1.5"
-                />
-              </div>
-            </section>
-
-            {/* Video & SEO Section */}
-            <section>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">
-                वीडियो और एसईओ (Video & SEO)
-              </h2>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="video_url" className="flex items-center gap-2 text-sm font-medium">
-                    <Youtube className="h-4 w-4 text-red-500" /> वीडियो एम्बेड कोड
-                  </Label>
-                  <Textarea 
-                    id="video_url" 
-                    value={articleData.video_url || ''} 
-                    onChange={handleInputChange} 
-                    placeholder="यहां वीडियो iframe एम्बेड कोड पेस्ट करें"
-                    className="mt-1.5 font-mono text-sm"
+                <div className="mt-4">
+                  <Label htmlFor="image_alt_text_hi" className="text-sm font-medium">छवि ऑल्ट टेक्स्ट (Image Alt Text)</Label>
+                  <Input
+                    id="image_alt_text_hi"
+                    value={articleData.image_alt_text_hi || ''}
+                    onChange={handleInputChange}
+                    placeholder="उदा., प्रधानमंत्री भाषण देते हुए"
+                    className="mt-1.5"
                   />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              </section>
+
+              {/* Video & SEO Section */}
+              <section>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">
+                  वीडियो और एसईओ (Video & SEO)
+                </h2>
+                <div className="space-y-4">
                   <div>
-                    <Label htmlFor="seo_title_hi" className="text-sm font-medium">एसईओ शीर्षक (SEO Title)</Label>
-                    <Input 
-                      id="seo_title_hi" 
-                      value={articleData.seo_title_hi || ''} 
-                      onChange={handleInputChange} 
-                      placeholder="कीवर्ड-युक्त शीर्षक"
-                      className="mt-1.5"
+                    <Label htmlFor="video_url" className="flex items-center gap-2 text-sm font-medium">
+                      <Youtube className="h-4 w-4 text-red-500" /> वीडियो एम्बेड कोड
+                    </Label>
+                    <Textarea
+                      id="video_url"
+                      value={articleData.video_url || ''}
+                      onChange={handleInputChange}
+                      placeholder="यहां वीडियो iframe एम्बेड कोड पेस्ट करें"
+                      className="mt-1.5 font-mono text-sm"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="seo_keywords_hi" className="text-sm font-medium">एसईओ कीवर्ड (SEO Keywords)</Label>
-                    <Input 
-                      id="seo_keywords_hi" 
-                      value={articleData.seo_keywords_hi || ''} 
-                      onChange={handleInputChange} 
-                      placeholder="उदा., राजनीति, चुनाव, भारत"
-                      className="mt-1.5"
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="seo_title_hi" className="text-sm font-medium">एसईओ शीर्षक (SEO Title)</Label>
+                      <Input
+                        id="seo_title_hi"
+                        value={articleData.seo_title_hi || ''}
+                        onChange={handleInputChange}
+                        placeholder="कीवर्ड-युक्त शीर्षक"
+                        className="mt-1.5"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="seo_keywords_hi" className="text-sm font-medium">एसईओ कीवर्ड (SEO Keywords)</Label>
+                      <Input
+                        id="seo_keywords_hi"
+                        value={articleData.seo_keywords_hi || ''}
+                        onChange={handleInputChange}
+                        placeholder="उदा., राजनीति, चुनाव, भारत"
+                        className="mt-1.5"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            </section>
+              </section>
 
-            {/* Content Preview Section */}
-            <section>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">
-                लेख सामग्री (Content Preview)
-              </h2>
-              <div
-                className="w-full min-h-[200px] md:min-h-[300px] rounded-lg border border-gray-200 dark:border-gray-700 p-4 md:p-6 bg-gray-50 dark:bg-gray-800 prose dark:prose-invert max-w-none overflow-auto"
-                dangerouslySetInnerHTML={{ __html: contentHtml || '<p class="text-gray-500 italic">.docx आयात के बाद सामग्री यहां दिखाई देगी।</p>' }}
-              />
-            </section>
+              {/* Content Preview Section */}
+              <section>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">
+                  लेख सामग्री (Content Preview)
+                </h2>
+                <div
+                  className="w-full min-h-[200px] md:min-h-[300px] rounded-lg border border-gray-200 dark:border-gray-700 p-4 md:p-6 bg-gray-50 dark:bg-gray-800 prose dark:prose-invert max-w-none overflow-auto"
+                  dangerouslySetInnerHTML={{ __html: contentHtml || '<p class="text-gray-500 italic">.docx आयात के बाद सामग्री यहां दिखाई देगी।</p>' }}
+                />
+              </section>
             </div>
 
             {/* Sticky Footer Actions (Mobile) */}
             <div className="sticky bottom-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 md:hidden">
               <div className="flex gap-3">
-                <Button 
-                  variant="outline" 
-                  onClick={handleCancel} 
+                <Button
+                  variant="outline"
+                  onClick={handleCancel}
                   disabled={isProcessing}
                   className="flex-1"
                 >
                   रद्द करें
                 </Button>
-                <Button 
-                  onClick={handleSave} 
+                <Button
+                  onClick={handleSave}
                   disabled={isProcessing || !articleData.title_hi}
                   className="flex-1"
                 >
@@ -908,8 +841,8 @@ n    // Temporarily skip role check for testing
           </div>
         )}
       </main>
-      
-      <Footer currentContent={currentContent} onNavigate={() => {}} onSelectCategory={() => {}} />
+
+      <Footer currentContent={currentContent} onNavigate={() => { }} onSelectCategory={() => { }} />
     </div>
   );
 };

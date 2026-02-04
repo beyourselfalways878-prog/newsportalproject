@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Sun, Moon, Search, BellDot, User, LogOut, Settings } from 'lucide-react';
-import { useAuth } from '@/contexts/SupabaseAuthContext.jsx';
+import { useAuth } from '@/contexts/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 import LatestNewsTicker from '@/components/news/LatestNewsTicker';
 
@@ -47,41 +47,41 @@ const Header = ({
               transition={{ duration: 0.5 }}
               className="flex items-center space-x-1 sm:space-x-2"
             >
-               {user ? (
+              {user ? (
                 <div className="flex items-center space-x-2">
-                    <span className="text-sm text-white/90 hidden md:block">
-                      स्वागत है, {profile?.full_name || user.email}
-                    </span>
-                    {user && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => navigate('/dashboard')}
-                        className="text-white/90 hover:text-white bg-white/10 hover:bg-white/20 transition-colors"
-                        aria-label="Admin Dashboard"
-                      >
-                        <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
-                      </Button>
-                    )}
+                  <span className="text-sm text-white/90 hidden md:block">
+                    स्वागत है, {profile?.full_name || user.email}
+                  </span>
+                  {user && (
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={async () => {
-                        console.log('Logout button clicked');
-                        try {
-                          await signOut();
-                        } catch (error) {
-                          console.error('Logout error:', error);
-                        }
-                      }}
+                      onClick={() => navigate('/dashboard')}
                       className="text-white/90 hover:text-white bg-white/10 hover:bg-white/20 transition-colors"
-                      aria-label="Log Out"
+                      aria-label="Admin Dashboard"
                     >
-                      <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
                     </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={async () => {
+                      console.log('Logout button clicked');
+                      try {
+                        await signOut();
+                      } catch (error) {
+                        console.error('Logout error:', error);
+                      }
+                    }}
+                    className="text-white/90 hover:text-white bg-white/10 hover:bg-white/20 transition-colors"
+                    aria-label="Log Out"
+                  >
+                    <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </Button>
                 </div>
               ) : (
-                 <Button
+                <Button
                   variant="ghost"
                   size="sm"
                   onClick={onLoginClick}
@@ -112,7 +112,7 @@ const Header = ({
             >
               <button onClick={onLogoClick} className="block hover:opacity-90 transition-opacity" aria-label="Back to homepage">
                 <span className="text-lg md:text-2xl font-extrabold text-white tracking-wider" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.25)' }}>
-                  {siteName}
+                  {language === 'hi' ? '24x7 इण्डियन न्यूज़' : siteName}
                 </span>
               </button>
             </motion.div>

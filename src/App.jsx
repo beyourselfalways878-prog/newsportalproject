@@ -1,7 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
-import { AuthProvider } from '@/contexts/SupabaseAuthContext.jsx';
+import { AuthProvider } from '@/contexts/AuthContext.jsx';
 import ProtectedRoute from '@/components/admin/ProtectedRoute.jsx';
 import { Loader2 } from 'lucide-react';
 

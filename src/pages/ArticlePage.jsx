@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/SupabaseAuthContext.jsx';
-import { supabase } from '@/lib/customSupabaseClient.js';
-import { toast } from '@/components/ui/use-toast';
+import { useAuth } from '@/contexts/AuthContext.jsx';
+import { fetchArticle } from '@/lib/db.js';
+import { useToast } from '@/components/ui/use-toast';
 import { contentData } from '@/lib/data';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
@@ -14,6 +14,7 @@ const ArticlePage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, profile } = useAuth();
+  const { toast } = useToast();
   const [article, setArticle] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
@@ -24,15 +25,12 @@ const ArticlePage = () => {
   const currentContent = contentData[language];
   const baseUrl = window.location.origin;
 
-  const fetchArticle = useCallback(async () => {
+  const loadArticle = useCallback(async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('articles')
-      .select('id,title_hi,excerpt_hi,content_hi,category,author,location,published_at,updated_at,image_url,image_alt_text_hi,seo_title_hi,seo_keywords_hi,video_url')
-      .eq('id', id)
-      .single();
-
-    if (error || !data) {
+    try {
+      const data = await fetchArticle(id);
+      setArticle(data);
+    } catch (error) {
       console.error('Error fetching article:', error);
       toast({
         title: 'Error',
@@ -40,18 +38,17 @@ const ArticlePage = () => {
         variant: 'destructive',
       });
       navigate('/');
-    } else {
-      setArticle(data);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
-  }, [id, navigate]);
+  }, [id, navigate, toast]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'light';
     setDarkMode(savedTheme === 'dark');
     document.documentElement.classList.toggle('dark', savedTheme === 'dark');
-    fetchArticle();
-  }, [fetchArticle]);
+    loadArticle();
+  }, [loadArticle]);
 
   const toggleDarkMode = () => {
     const newMode = !darkMode;
@@ -130,7 +127,7 @@ const ArticlePage = () => {
           </div>
         )}
       </div>
-      <Footer currentContent={currentContent} onNavigate={() => {}} onSelectCategory={() => {}} />
+      <Footer currentContent={currentContent} onNavigate={() => { }} onSelectCategory={() => { }} />
 
       {canEdit && (
         <ArticleUploader

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
-import { toast } from '@/components/ui/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import Sidebar from '@/components/layout/Sidebar';
@@ -15,12 +15,13 @@ import ArticleGrid from '@/components/news/ArticleGrid';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2 } from 'lucide-react';
 import { contentData } from '@/lib/data';
-import { supabase } from '@/lib/customSupabaseClient.js';
-import { useAuth } from '@/contexts/SupabaseAuthContext.jsx';
+import { fetchArticles, fetchTrendingTopics } from '@/lib/db.js';
+import { useAuth } from '@/contexts/AuthContext.jsx';
 
 const HomePage = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const language = 'hi';
   const [darkMode, setDarkMode] = useState(false);
   const [email, setEmail] = useState('');
@@ -38,92 +39,27 @@ const HomePage = () => {
 
   const baseUrl = window.location.origin;
 
-  const INITIAL_FETCH_SIZE = 11; // fetch a little extra so featured can be excluded while still showing 10
+  const INITIAL_FETCH_SIZE = 11;
   const LOAD_MORE_SIZE = 10;
 
   const ARTICLES_CACHE_KEY = `home:${language}:articles:v1`;
   const TRENDING_CACHE_KEY = `home:${language}:trending:v1`;
-  const CACHE_TTL_MS = 1000 * 60 * 3; // 3 minutes
-
-  const listSelect =
-    'id,title_hi,excerpt_hi,category,is_breaking,is_featured,image_url,image_alt_text_hi,author,location,published_at,updated_at,video_url';
-
-  const fetchFeatured = useCallback(async () => {
-    try {
-      const queryPromise = supabase
-        .from('articles')
-        .select(listSelect)
-        .eq('is_featured', true)
-        .order('published_at', { ascending: false })
-        .limit(1);
-
-      const { data, error } = await queryPromise;
-
-      if (error) {
-        console.error('Error fetching featured article:', error);
-        return null;
-      }
-
-      return data?.[0] ?? null;
-    } catch (err) {
-      console.error('Featured fetch error:', err);
-      return null;
-    }
-  }, [listSelect]);
+  const CACHE_TTL_MS = 1000 * 60 * 3;
 
   const fetchNews = useCallback(async ({ showLoader = true, retries = 2 } = {}) => {
     if (showLoader) setIsLoading(true);
 
-    const from = 0;
-    const to = INITIAL_FETCH_SIZE - 1;
-
     try {
-      const [featured, latest] = await Promise.all([
-        fetchFeatured(),
-        supabase
-          .from('articles')
-          .select(listSelect)
-          .order('published_at', { ascending: false })
-          .range(from, to),
-      ]);
+      const data = await fetchArticles({ limit: INITIAL_FETCH_SIZE });
 
-      const { data, error } = latest;
-
-      if (error) {
-        console.error('Error fetching articles:', error);
-
-        // If PostgREST returns a 400 or transient error, retry a couple times
-        if (retries > 0) {
-          console.warn(`Retrying fetchNews (${retries} left)`);
-          await new Promise((r) => setTimeout(r, 1000));
-          return fetchNews({ showLoader, retries: retries - 1 });
-        }
-
-        toast({
-          title: 'Error Fetching News',
-          description: error?.message || 'Could not load articles from the database.',
-          variant: 'destructive',
-        });
-        console.error('Full error object from supabase:', error);
-        setFeaturedArticle(null);
-        setArticles([]);
-        setVisibleCount(10);
-        setNextFrom(0);
-        setHasMore(false);
-        if (showLoader) setIsLoading(false);
-        return;
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid response format');
       }
 
-      console.log('Fetched articles data:', data); // Debug log
+      const featured = data.find(a => a.is_featured) || data[0] || null;
+      const filtered = (data || []).filter((a) => a?.id && a.id !== featured?.id);
 
-      const fallbackFeatured = data?.[0] ?? null;
-      const finalFeatured = featured ?? fallbackFeatured;
-      const filtered = (data || []).filter((a) => a?.id && a.id !== finalFeatured?.id);
-
-      console.log('Featured article:', finalFeatured); // Debug log
-      console.log('Filtered articles:', filtered); // Debug log
-
-      setFeaturedArticle(finalFeatured);
+      setFeaturedArticle(featured);
       setArticles(filtered);
       setVisibleCount(10);
       setNextFrom(data?.length || 0);
@@ -132,7 +68,7 @@ const HomePage = () => {
       try {
         sessionStorage.setItem(
           ARTICLES_CACHE_KEY,
-          JSON.stringify({ ts: Date.now(), featured: finalFeatured, articles: filtered, nextFrom: data?.length || 0, hasMore: (data?.length || 0) === INITIAL_FETCH_SIZE })
+          JSON.stringify({ ts: Date.now(), featured, articles: filtered, nextFrom: data?.length || 0, hasMore: (data?.length || 0) === INITIAL_FETCH_SIZE })
         );
       } catch {
         // ignore cache write issues
@@ -140,15 +76,17 @@ const HomePage = () => {
 
       if (showLoader) setIsLoading(false);
     } catch (err) {
-      console.error('Unexpected error in fetchNews:', err);
-      // Retry for transient errors
+      console.error('Error fetching articles:', err);
+
       if (retries > 0) {
+        console.warn(`Retrying fetchNews (${retries} left)`);
         await new Promise((r) => setTimeout(r, 1000));
         return fetchNews({ showLoader, retries: retries - 1 });
       }
+
       toast({
         title: 'Error Loading News',
-        description: 'An unexpected error occurred while loading articles.',
+        description: 'Could not load articles from the database.',
         variant: 'destructive',
       });
       setFeaturedArticle(null);
@@ -158,34 +96,27 @@ const HomePage = () => {
       setHasMore(false);
       if (showLoader) setIsLoading(false);
     }
-  }, [ARTICLES_CACHE_KEY, INITIAL_FETCH_SIZE, fetchFeatured, listSelect]);
+  }, [ARTICLES_CACHE_KEY, INITIAL_FETCH_SIZE, toast]);
 
   const fetchMoreNews = useCallback(async () => {
     if (isLoadingMore || !hasMore) return;
 
     setIsLoadingMore(true);
     const from = nextFrom;
-    const to = from + LOAD_MORE_SIZE - 1;
 
-    const { data, error } = await supabase
-      .from('articles')
-      .select(listSelect)
-      .order('published_at', { ascending: false })
-      .range(from, to);
-
-    if (error) {
+    try {
+      const data = await fetchArticles({ limit: LOAD_MORE_SIZE, offset: from });
+      const filtered = (data || []).filter((a) => a?.id && a.id !== featuredArticle?.id);
+      setArticles((prev) => [...prev, ...filtered]);
+      setNextFrom(from + (data?.length || 0));
+      setHasMore((data?.length || 0) === LOAD_MORE_SIZE);
+    } catch (error) {
       console.error('Error fetching more articles:', error);
       setHasMore(false);
+    } finally {
       setIsLoadingMore(false);
-      return;
     }
-
-    const filtered = (data || []).filter((a) => a?.id && a.id !== featuredArticle?.id);
-    setArticles((prev) => [...prev, ...filtered]);
-    setNextFrom(from + (data?.length || 0));
-    setHasMore((data?.length || 0) === LOAD_MORE_SIZE);
-    setIsLoadingMore(false);
-  }, [LOAD_MORE_SIZE, featuredArticle?.id, hasMore, isLoadingMore, listSelect, nextFrom]);
+  }, [LOAD_MORE_SIZE, featuredArticle?.id, hasMore, isLoadingMore, nextFrom]);
 
   const handleLoadMore = async () => {
     const target = visibleCount + LOAD_MORE_SIZE;
@@ -205,7 +136,6 @@ const HomePage = () => {
     let isMounted = true;
 
     const loadData = async () => {
-      // Fast path: render cached content immediately.
       try {
         const cached = JSON.parse(sessionStorage.getItem(ARTICLES_CACHE_KEY) || 'null');
         if (cached?.ts && Array.isArray(cached?.articles) && Date.now() - cached.ts < CACHE_TTL_MS) {
@@ -217,7 +147,6 @@ const HomePage = () => {
             setHasMore(!!cached.hasMore);
             setIsLoading(false);
           }
-          // Refresh in background
           fetchNews({ showLoader: false });
         } else {
           await fetchNews({ showLoader: true });
@@ -226,12 +155,11 @@ const HomePage = () => {
         await fetchNews({ showLoader: true });
       }
 
-      fetchTrendingTopics();
+      loadTrendingTopics();
     };
 
     loadData();
 
-    // Safety timeout - ensure loading is false after 10 seconds max
     const timeout = setTimeout(() => {
       if (isMounted) {
         setIsLoading(false);
@@ -244,31 +172,28 @@ const HomePage = () => {
     };
   }, []);
 
-  const fetchTrendingTopics = async () => {
+  const loadTrendingTopics = async () => {
     try {
       const cached = JSON.parse(sessionStorage.getItem(TRENDING_CACHE_KEY) || 'null');
       if (cached?.ts && Array.isArray(cached?.data) && Date.now() - cached.ts < CACHE_TTL_MS) {
         setTrendingDbTopics(cached.data);
+        return;
       }
     } catch {
       // ignore cache read issues
     }
 
-    const { data, error } = await supabase
-      .from('trending_topics')
-      .select('name_hi,rank')
-      .order('rank', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching trending topics:', error);
-    } else {
-      setTrendingDbTopics(data);
+    try {
+      const data = await fetchTrendingTopics();
+      setTrendingDbTopics(data || []);
 
       try {
         sessionStorage.setItem(TRENDING_CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
       } catch {
         // ignore cache write issues
       }
+    } catch (error) {
+      console.error('Error fetching trending topics:', error);
     }
   };
 
@@ -282,19 +207,28 @@ const HomePage = () => {
   const handleSubscribe = async (e) => {
     e.preventDefault();
     if (email) {
-      const { error } = await supabase.from('subscribers').insert([{ email, language }]);
-      if (error) {
-        toast({
-          title: 'Subscription Failed',
-          description: error.message,
-          variant: 'destructive',
+      try {
+        const response = await fetch('/api/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, language }),
         });
-      } else {
+
+        if (!response.ok) {
+          throw new Error('Subscription failed');
+        }
+
         toast({
           title: 'Subscribed!',
           description: 'You have been added to our newsletter.',
         });
         setEmail('');
+      } catch (error) {
+        toast({
+          title: 'Subscription Failed',
+          description: error.message,
+          variant: 'destructive',
+        });
       }
     }
   };
@@ -323,7 +257,8 @@ const HomePage = () => {
   };
 
   const handleUploadClick = () => {
-    if (user?.email === 'pushkarraj207@gmail.com') {
+    const isAdmin = profile?.role === 'admin' || profile?.role === 'editor';
+    if (isAdmin) {
       setIsUploaderOpen(true);
     } else {
       toast({
@@ -397,7 +332,7 @@ const HomePage = () => {
   const pageTitle = `${currentContent.siteName} | ${currentContent.tagline}`;
   const pageDescription = currentContent.siteDescription || 'भारत और दुनिया की 24x7 ख़बरों का आपका विश्वसनीय स्रोत';
   const generalKeywords = "भारत समाचार आज, आज की ताजा खबर, राष्ट्रीय समाचार, भाजपा, कांग्रेस, नवीनतम समाचार, ब्रेकिंग न्यूज";
-  const canUpload = user?.email === 'pushkarraj207@gmail.com';
+  const canUpload = profile?.role === 'admin' || profile?.role === 'editor';
 
   return (
     <>
@@ -446,7 +381,7 @@ const HomePage = () => {
           </motion.div>
         </div>
       )}
-       {canUpload && (
+      {canUpload && (
         <ArticleUploader
           isOpen={isUploaderOpen}
           setIsOpen={setIsUploaderOpen}
@@ -454,7 +389,7 @@ const HomePage = () => {
           currentContent={currentContent}
           categories={categories}
         />
-       )}
+      )}
     </>
   );
 };

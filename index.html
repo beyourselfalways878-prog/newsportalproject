@@ -1,46 +1,67 @@
 <!doctype html>
 <html lang="hi">
-	<head>
-		<meta charset="UTF-8" />
-		<link rel="icon" type="image/svg+xml" href="/vite.svg" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
-		
-		<!-- Preconnect for faster loading -->
-		<link rel="preconnect" href="https://fonts.googleapis.com" />
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-		<link rel="preconnect" href="https://dwndkhllkhqihtedyaac.supabase.co" />
-		
-		<!-- DNS Prefetch -->
-		<link rel="dns-prefetch" href="https://pagead2.googlesyndication.com" />
-		
-		<title>24x7 Indian News | ताज़ा ख़बरें - भारत और दुनिया की ब्रेकिंग न्यूज़</title>
-		<meta name="description" content="24x7 Indian News: भारत और दुनिया की ताज़ा ख़बरें, ब्रेकिंग न्यूज़ और गहन विश्लेषण। राजनीति, व्यापार, खेल, मनोरंजन, तकनीक और बहुत कुछ — एक ही जगह।" />
-		<meta name="keywords" content="24x7 Indian News, Hindi news, Indian news, global news, breaking news, live updates, politics, business, sports, entertainment, technology, India, world, ताज़ा ख़बरें, समाचार, भारत समाचार, विश्व समाचार" />
-		<meta property="og:title" content="24x7 Indian News | ताज़ा ख़बरें - भारत और दुनिया की ब्रेकिंग न्यूज़" />
-		<meta property="og:description" content="24x7 Indian News: भारत और दुनिया की ताज़ा ख़बरें, ब्रेकिंग न्यूज़ और गहन विश्लेषण।" />
-		<meta property="og:type" content="website" />
-		<meta property="og:url" content="https://24x7indiannews.online/" />
-		<meta property="og:image" content="https://24x7indiannews.online/social-card.svg" />
-		<link rel="canonical" href="https://24x7indiannews.online/" />
-		<link rel="alternate" hreflang="hi" href="https://24x7indiannews.online/" />
-		<link rel="alternate" hreflang="x-default" href="https://24x7indiannews.online/" />
-		
-		<!-- Theme color for mobile browsers -->
-		<meta name="theme-color" content="#ec4899" />
-		<meta name="mobile-web-app-capable" content="yes" />
-		<meta name="apple-mobile-web-app-capable" content="yes" />
-		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-		<!-- Google Search Console verification -->
-		<meta name="google-site-verification" content="Xr2ygkt5qAPO0CJcs0YDd-CD8PxcU0YkpvWQzmcSmEw" />
+<head>
+	<meta charset="UTF-8" />
+	<link rel="icon" type="image/svg+xml" href="/vite.svg" />
+	<meta name="viewport"
+		content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 
-		<!-- Google AdSense -->
-		<meta name="google-adsense-account" content="ca-pub-7229649791586904" />
-		<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7229649791586904"
-     crossorigin="anonymous"></script>
+	<!-- Preconnect for faster loading -->
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link rel="preconnect" href="https://firestore.googleapis.com" />
 
-		<!-- Schema.org markup for Google News -->
-		<script type="application/ld+json">
+	<!-- DNS Prefetch -->
+	<link rel="dns-prefetch" href="https://pagead2.googlesyndication.com" />
+
+	<title>24x7 Indian News | ताज़ा ख़बरें - भारत और दुनिया की ब्रेकिंग न्यूज़</title>
+	<meta name="description"
+		content="24x7 Indian News: भारत और दुनिया की ताज़ा ख़बरें, ब्रेकिंग न्यूज़ और गहन विश्लेषण। राजनीति, व्यापार, खेल, मनोरंजन, तकनीक और बहुत कुछ — एक ही जगह।" />
+	<meta name="keywords"
+		content="24x7 Indian News, Hindi news, Indian news, global news, breaking news, live updates, politics, business, sports, entertainment, technology, India, world, ताज़ा ख़बरें, समाचार, भारत समाचार, विश्व समाचार" />
+	<meta property="og:title" content="24x7 Indian News | ताज़ा ख़बरें - भारत और दुनिया की ब्रेकिंग न्यूज़" />
+	<meta property="og:description"
+		content="24x7 Indian News: भारत और दुनिया की ताज़ा ख़बरें, ब्रेकिंग न्यूज़ और गहन विश्लेषण।" />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content="https://24x7indiannews.online/" />
+	<meta property="og:image" content="https://24x7indiannews.online/social-card.svg" />
+	<link rel="canonical" href="https://24x7indiannews.online/" />
+	<link rel="alternate" hreflang="hi" href="https://24x7indiannews.online/" />
+	<link rel="alternate" hreflang="x-default" href="https://24x7indiannews.online/" />
+
+	<!-- Theme color for mobile browsers -->
+	<meta name="theme-color" content="#ec4899" />
+	<meta name="mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+	<meta name="apple-mobile-web-app-title" content="24x7 News" />
+
+	<!-- PWA Manifest -->
+	<link rel="manifest" href="/manifest.json" />
+
+	<!-- Twitter Card Meta -->
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:site" content="@newsindian24x7" />
+	<meta name="twitter:title" content="24x7 Indian News | ताज़ा ख़बरें" />
+	<meta name="twitter:description" content="भारत और दुनिया की ताज़ा ख़बरें, ब्रेकिंग न्यूज़ और गहन विश्लेषण" />
+	<meta name="twitter:image" content="https://24x7indiannews.online/social-card.svg" />
+
+	<!-- Additional SEO -->
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+	<meta name="author" content="24x7 Indian News" />
+	<meta name="publisher" content="24x7 Indian News" />
+
+	<!-- Google Search Console verification -->
+	<meta name="google-site-verification" content="Xr2ygkt5qAPO0CJcs0YDd-CD8PxcU0YkpvWQzmcSmEw" />
+
+	<!-- Google AdSense -->
+	<meta name="google-adsense-account" content="ca-pub-7229649791586904" />
+	<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7229649791586904"
+		crossorigin="anonymous"></script>
+
+	<!-- Schema.org markup for Google News -->
+	<script type="application/ld+json">
 		{
 			"@context": "https://schema.org",
 			"@type": "NewsMediaOrganization",
@@ -60,9 +81,11 @@
 			]
 		}
 		</script>
-	</head>
-	<body>
-		<div id="root"></div>
-		<script type="module" src="/src/main.jsx"></script>
-	</body>
+</head>
+
+<body>
+	<div id="root"></div>
+	<script type="module" src="/src/main.jsx"></script>
+</body>
+
 </html>

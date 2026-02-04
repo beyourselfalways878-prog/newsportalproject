@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuth } from '@/contexts/SupabaseAuthContext.jsx';
+import { useAuth } from '@/contexts/AuthContext.jsx';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, AlertCircle } from 'lucide-react';
- 
+
 
 const AuthModal = ({ isOpen, setIsOpen }) => {
   const { signIn } = useAuth();
@@ -74,7 +74,7 @@ const AuthModal = ({ isOpen, setIsOpen }) => {
                 <Label htmlFor="login-password">Password</Label>
                 <Input id="login-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
-              {error && <div className="text-destructive text-sm flex items-center"><AlertCircle className="h-4 w-4 mr-2"/>{error}</div>}
+              {error && <div className="text-destructive text-sm flex items-center"><AlertCircle className="h-4 w-4 mr-2" />{error}</div>}
               <Button type="submit" disabled={isLoading} className="w-full">
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Login

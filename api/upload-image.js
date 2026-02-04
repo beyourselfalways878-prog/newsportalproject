@@ -1,4 +1,29 @@
-import { createClient } from '@supabase/supabase-js';
+import { getOne, COLLECTIONS } from './_appwrite.js';
+import jwt from 'jsonwebtoken';
+import { Client, Storage } from 'node-appwrite';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+function verifyToken(token) {
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch (error) {
+    return null;
+  }
+}
+
+function getStorage() {
+  const endpoint = process.env.APPWRITE_ENDPOINT;
+  const projectId = process.env.APPWRITE_PROJECT_ID;
+  const apiKey = process.env.APPWRITE_API_KEY;
+
+  const client = new Client()
+    .setEndpoint(endpoint)
+    .setProject(projectId)
+    .setKey(apiKey);
+
+  return new Storage(client);
+}
 
 export default async function handler(req, res) {
   try {
@@ -10,25 +35,17 @@ export default async function handler(req, res) {
     }
     const token = authHeader.split(' ')[1];
 
-    const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !serviceKey) return res.status(500).json({ error: 'Missing server-side Supabase credentials (service role key not set)' });
-
-    // Use a short-lived verifier client to avoid mutating the admin client's auth state
-    const verifier = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-    const { data: userData, error: userErr } = await verifier.auth.getUser(token);
-    if (userErr || !userData?.user) {
+    const decoded = verifyToken(token);
+    if (!decoded) {
       return res.status(401).json({ error: 'Invalid token' });
     }
-    const user = userData.user;
+    const userId = decoded.userId;
 
-    // Create a fresh admin client for privileged actions (do not reuse verifier)
-    const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    // Check user role
+    const user = await getOne(COLLECTIONS.USERS, userId);
+    if (!user) return res.status(401).json({ error: 'User not found' });
 
-    // Check profile role
-    const { data: profileRow, error: profileErr } = await admin.from('profiles').select('role').eq('id', user.id).maybeSingle();
-    if (profileErr) return res.status(500).json({ error: 'Profile lookup failed' });
-    const role = (profileRow?.role || '').toLowerCase();
+    const role = (user.role || '').toLowerCase();
     if (!(role === 'admin' || role === 'superuser')) {
       return res.status(403).json({ error: 'Insufficient privileges' });
     }
@@ -36,26 +53,26 @@ export default async function handler(req, res) {
     const { filename, content_type, data } = req.body || {};
     if (!filename || !content_type || !data) return res.status(400).json({ error: 'Missing filename, content_type or data' });
 
+    // Upload to Appwrite Storage
+    const storage = getStorage();
     const buffer = Buffer.from(data, 'base64');
+    const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const fileId = `${Date.now()}-${safeName}`;
 
-    const { data: uploadData, error: uploadErr } = await admin.storage.from('article-images').upload(filename, buffer, { contentType: content_type });
-    if (uploadErr) {
-      console.error('Service upload error:', uploadErr);
-      // Log fallback attempt
-      try {
-        await admin.from('admin_fallbacks').insert([{ user_id: user.id, event_type: 'upload', details: { filename, error: uploadErr } }]);
-      } catch (logErr) { console.warn('Failed to log admin fallback:', logErr); }
-      return res.status(500).json({ error: uploadErr.message || uploadErr });
-    }
+    const file = await storage.createFile(
+      'images', // bucket ID
+      fileId,
+      new File([buffer], safeName, { type: content_type })
+    );
 
-    const { data: urlData } = admin.storage.from('article-images').getPublicUrl(uploadData.path);
+    // Generate public URL
+    const publicUrl = storage.getFileView('images', fileId);
 
-    // Log successful service upload
-    try {
-      await admin.from('admin_fallbacks').insert([{ user_id: user.id, event_type: 'upload', details: { filename, path: uploadData.path, publicUrl: urlData.publicUrl, method: 'service' } }]);
-    } catch (logErr) { console.warn('Failed to log admin fallback:', logErr); }
-
-    return res.status(200).json({ path: uploadData.path, publicUrl: urlData.publicUrl });
+    return res.status(200).json({
+      fileId: file.$id,
+      path: `/uploads/${fileId}`,
+      publicUrl: publicUrl.toString(),
+    });
 
   } catch (err) {
     console.error('upload-image error:', err);

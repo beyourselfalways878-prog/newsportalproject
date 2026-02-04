@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/customSupabaseClient';
+import { createArticle, uploadImage } from '@/lib/db.js';
 import { useToast } from '@/components/ui/use-toast';
 import {
   Dialog,
@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, FileText, Image as ImageIcon } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 let mammothPromise;
 const getMammoth = () => {
@@ -30,8 +31,9 @@ const getMammoth = () => {
 // - Uses consistent shadcn-style UI components
 const ArticleEditor = ({ isOpen, onClose, article, onSave, currentContent, categories }) => {
   const { toast } = useToast();
+  const { token } = useAuth();
 
-  const formatSupabaseError = (err) => {
+  const formatError = (err) => {
     if (!err) return 'Unknown error';
     if (typeof err === 'string') return err;
     const parts = [err.message, err.details, err.hint, err.code].filter(Boolean);
@@ -140,16 +142,21 @@ const ArticleEditor = ({ isOpen, onClose, article, onSave, currentContent, categ
           const blob = dataURItoBlob(`data:${image.contentType};base64,${imageBuffer}`);
           const fileName = `articles/${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('article-images')
-            .upload(fileName, blob, { contentType: image.contentType });
 
-          if (uploadError) {
-            throw uploadError;
-          }
 
-          const { data: urlData } = supabase.storage.from('article-images').getPublicUrl(uploadData.path);
-          return { src: urlData.publicUrl };
+
+
+          // if (uploadError) {
+          //   throw uploadError;
+          // }
+
+          // Mock file object for uploadImage function
+          const file = new File([blob], `image-${Date.now()}.png`, { type: image.contentType });
+
+          if (!token) throw new Error("Authentication required for upload");
+
+          const response = await uploadImage(file, token);
+          return { src: response.url };
         }),
       };
 
@@ -167,24 +174,12 @@ const ArticleEditor = ({ isOpen, onClose, article, onSave, currentContent, categ
     setIsBusy(true);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session) {
-        toast({ variant: 'destructive', title: 'Login required', description: 'Your session has expired. Please log in again.' });
-        return;
-      }
-
       let finalImageUrl = featuredPreviewUrl || article?.image_url || '';
 
       if (featuredImageFile) {
-        const fileName = `featured/${Date.now()}-${featuredImageFile.name}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('article-images')
-          .upload(fileName, featuredImageFile, { upsert: !!formData.id });
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage.from('article-images').getPublicUrl(uploadData.path);
-        finalImageUrl = urlData.publicUrl;
+        if (!token) throw new Error("Authentication required for upload");
+        const response = await uploadImage(featuredImageFile, token);
+        finalImageUrl = response.url;
       }
 
       const nowIso = new Date().toISOString();
@@ -197,14 +192,14 @@ const ArticleEditor = ({ isOpen, onClose, article, onSave, currentContent, categ
         published_at: formData.id ? article?.published_at : nowIso,
       };
 
-      const { error } = await supabase.from('articles').upsert(payload);
-      if (error) throw error;
+      // Call API
+      await createArticle(payload); // API wrapper should handle the call
 
       toast({ title: formData.id ? 'Article Updated' : 'Article Saved' });
       onSave?.();
       onClose?.();
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Save failed', description: formatSupabaseError(error) });
+      toast({ variant: 'destructive', title: 'Save failed', description: formatError(error) });
     } finally {
       setIsBusy(false);
     }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/customSupabaseClient';
+import { fetchArticles, deleteArticle, toggleFeatured } from '@/lib/db.js';
 import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,39 +24,21 @@ const ArticleManager = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteDialog, setDeleteDialog] = useState({ open: false, article: null });
+  const [actionLoading, setActionLoading] = useState(null); // Track which article action is loading
   const { toast } = useToast();
+  const { token } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchArticles();
+    fetchArticlesList();
   }, []);
 
-  const fetchArticles = async (retryCount = 0) => {
+  const fetchArticlesList = async () => {
     try {
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Query timeout')), 15000); // 15 second timeout
-      });
-
-      const queryPromise = supabase
-        .from('articles')
-        .select('*')
-        .order('published_at', { ascending: false })
-        .limit(100); // Limit to 100 articles for admin view
-
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
-
-      if (error) throw error;
+      const data = await fetchArticles();
       setArticles(data || []);
     } catch (error) {
       console.error('Error fetching articles:', error);
-      
-      // Retry once if it's a timeout
-      if (retryCount === 0 && error.message.includes('timeout')) {
-        console.log('Retrying article fetch...');
-        setTimeout(() => fetchArticles(1), 1000);
-        return;
-      }
-      
       toast({
         title: 'Error',
         description: 'Failed to load articles - please refresh the page',
@@ -67,28 +50,23 @@ const ArticleManager = () => {
   };
 
   const handleDelete = async (article) => {
-    try {
-      const { error } = await supabase
-        .from('articles')
-        .delete()
-        .eq('id', article.id);
-
-      if (error) throw error;
-
-      setArticles(articles.filter(a => a.id !== article.id));
-      toast({
-        title: 'Success',
-        description: 'Article deleted successfully'
-      });
-    } catch (error) {
-      console.error('Error deleting article:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete article',
-        variant: 'destructive'
-      });
+    if (!token) {
+      toast({ title: "Authentication Required", description: "Please log in to delete articles.", variant: "destructive" });
+      return;
     }
-    setDeleteDialog({ open: false, article: null });
+
+    setActionLoading(article.id);
+    try {
+      await deleteArticle(article.id, token);
+      setArticles(prev => prev.filter(a => a.id !== article.id));
+      toast({ title: "✅ Deleted", description: `"${article.title_hi}" has been deleted.` });
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast({ title: "Delete Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+      setDeleteDialog({ open: false, article: null });
+    }
   };
 
   const handleEdit = (article) => {
@@ -100,28 +78,24 @@ const ArticleManager = () => {
   };
 
   const handleToggleFeatured = async (article) => {
+    if (!token) {
+      toast({ title: "Authentication Required", description: "Please log in to update articles.", variant: "destructive" });
+      return;
+    }
+
+    setActionLoading(article.id);
     try {
-      const { error } = await supabase
-        .from('articles')
-        .update({ is_featured: !article.is_featured })
-        .eq('id', article.id);
-
-      if (error) throw error;
-
+      const updated = await toggleFeatured(article.id, token);
+      setArticles(prev => prev.map(a => a.id === article.id ? { ...a, is_featured: updated.is_featured } : a));
       toast({
-        title: 'Success',
-        description: `Article ${!article.is_featured ? 'marked as' : 'unmarked from'} featured.`,
+        title: updated.is_featured ? "⭐ Featured" : "Unfeatured",
+        description: `"${article.title_hi}" ${updated.is_featured ? 'is now featured' : 'removed from featured'}.`
       });
-
-      // Refresh the list
-      fetchArticles();
     } catch (error) {
-      console.error('Error toggling featured:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update featured status.',
-        variant: 'destructive',
-      });
+      console.error('Toggle featured error:', error);
+      toast({ title: "Update Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -171,7 +145,7 @@ const ArticleManager = () => {
             size="sm"
             onClick={() => {
               setLoading(true);
-              fetchArticles();
+              fetchArticlesList();
             }}
             disabled={loading}
           >
@@ -221,14 +195,14 @@ const ArticleManager = () => {
                         {article.title_hi}
                       </h3>
                       <div className="flex items-center gap-2 flex-shrink-0">                        {article.is_featured && (
-                          <Badge variant="default" className="text-xs bg-yellow-500 text-black">
-                            ⭐ Featured
-                          </Badge>
-                        )}                        {article.is_breaking && (
-                          <Badge variant="destructive" className="text-xs">
-                            ब्रेकिंग
-                          </Badge>
-                        )}
+                        <Badge variant="default" className="text-xs bg-yellow-500 text-black">
+                          ⭐ Featured
+                        </Badge>
+                      )}                        {article.is_breaking && (
+                        <Badge variant="destructive" className="text-xs">
+                          ब्रेकिंग
+                        </Badge>
+                      )}
                         <Badge variant="secondary" className="text-xs">
                           {article.category}
                         </Badge>

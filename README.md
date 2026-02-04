@@ -2,12 +2,16 @@
 
 A modern, Hindi-only news portal built with React and Vite, featuring real-time news updates, user authentication, and SEO optimizations. Designed for Indian audiences with a focus on breaking news, regional coverage, and in-depth analysis.
 
+**🚀 Status**: Recently migrated from Supabase to Neon serverless PostgreSQL. See [MIGRATION_STATUS.md](MIGRATION_STATUS.md) for details.
+
 ## 🌟 Features
 
 - **Hindi-Only Content**: Fully localized for Hindi-speaking users with no English fallbacks.
-- **Real-Time News**: Live updates from Supabase database with breaking news alerts.
-- **User Authentication**: Secure login/signup via Supabase Auth.
+- **Real-Time News**: Live updates from Neon PostgreSQL database with breaking news alerts.
+- **User Authentication**: Secure JWT-based authentication system.
 - **Admin Dashboard**: Upload and edit articles, manage videos, and user roles.
+- **Smart Article Uploader**: Auto-extract fields from DOCX, AI-powered suggestions, real-time SEO scoring.
+- **Video Management**: Upload, preview, and manage videos with progress tracking.
 - **SEO Optimized**: Includes ads.txt, robots.txt, sitemap.xml, and structured data for search engines.
 - **Responsive Design**: Mobile-first UI with TailwindCSS and Radix UI components.
 - **Performance Focused**: Lazy loading, code splitting, and optimized bundles.
@@ -16,13 +20,18 @@ A modern, Hindi-only news portal built with React and Vite, featuring real-time 
 ## 🛠 Tech Stack
 
 - **Frontend**: React 18, Vite 5, TailwindCSS 4, Radix UI
-- **Backend**: Supabase (Auth, Database, Storage)
+- **Backend**: Neon serverless PostgreSQL with JWT authentication
 - **Icons**: Lucide React
 - **Animations**: Framer Motion
 - **Document Processing**: Mammoth.js for DOCX uploads
+- **Authentication**: JWT tokens with secure password hashing
 - **Deployment**: Ready for Vercel/Netlify or static hosting
 
 ## 🚀 Installation
+
+### Quick Start (10 minutes)
+
+For a complete setup guide, see [QUICK_START.md](QUICK_START.md).
 
 1. **Clone the repository**:
    ```bash
@@ -37,25 +46,40 @@ A modern, Hindi-only news portal built with React and Vite, featuring real-time 
 
 3. **Set up environment variables**:
    - Copy `.env.example` to `.env`
-   - Add your Supabase URL and API keys:
+   - Add your Neon database connection string:
      ```
-     VITE_SUPABASE_URL=your_supabase_url
-     VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+     DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
+     VITE_DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
+     JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+     OPENAI_API_KEY=your-openai-key
+     CRICKETDATA_API_KEY=your-cricketdata-key
      ```
-   - **Important (security)**: For AI features set your server-side `OPENAI_API_KEY` (do NOT store OpenAI keys in `VITE_` variables which are bundled into the client). If you use CricketData and proxy it server-side, set `CRICKETDATA_API_KEY` in your hosting provider's secrets (not in client-exposed `VITE_` variables).
 
-4. **Run locally**:
+4. **Initialize database** (if not already done):
+   ```bash
+   psql "your-neon-connection-string" < DATABASE_SCHEMA.sql
+   ```
+
+5. **Run locally**:
    ```bash
    npm run dev
    ```
    Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-### Environment & Admin tools
+6. **Sign in with admin credentials**:
+   - Email: `admin@example.com`
+   - Password: `admin`
 
-- `npm run check:env` — Validates that required env vars are set and, if `SUPABASE_SERVICE_ROLE_KEY` is available, checks DB/table and storage bucket access.
-- `npm run create:profile` — Helper script to create or upsert a `profiles` row for a given user id (edit the script args before running or call with `node scripts/create_profile.mjs --id=<USER_ID> --role=admin --name="Full Name"`).
+### Migration from Supabase
 
-> Note: For production, add `SUPABASE_SERVICE_ROLE_KEY` and `CREATE_PROFILE_SECRET` as project secrets in your hosting provider (do NOT commit service role keys to the repository).
+If you're migrating from Supabase, see [DATA_MIGRATION_GUIDE.md](DATA_MIGRATION_GUIDE.md) for detailed instructions.
+
+### Environment & Admin Tools
+
+- `npm run check:env` — Validates that required env vars are set and checks database access.
+- `npm run create:profile` — Helper script to create or upsert a user profile.
+
+> **Security Note**: For production, change `JWT_SECRET` to a strong random value and store sensitive keys in your hosting provider's secrets (do NOT commit to repository).
 
 ## 📦 Build for Production
 
@@ -71,8 +95,28 @@ The `dist/` folder contains the production-ready files.
 - **Homepage**: Browse latest news, featured articles, and trending topics.
 - **Categories**: Filter news by categories like Politics, Business, Sports, etc.
 - **Articles**: Read full articles with related content and sharing options.
-- **Admin Panel**: Log in as admin to upload/edit content (email: pushkarraj207@gmail.com).
+- **Admin Panel**: Log in as admin to upload/edit content.
 - **Search**: Use the search bar for quick access to news.
+
+## 📚 Documentation
+
+### Getting Started
+- [QUICK_START.md](QUICK_START.md) - Get started in 10 minutes
+- [DEVELOPER_QUICK_REFERENCE.md](DEVELOPER_QUICK_REFERENCE.md) - Quick reference for developers
+
+### Migration & Setup
+- [NEON_MIGRATION_README.md](NEON_MIGRATION_README.md) - Migration overview
+- [DATA_MIGRATION_GUIDE.md](DATA_MIGRATION_GUIDE.md) - Data migration instructions
+- [MIGRATION_STATUS.md](MIGRATION_STATUS.md) - Current migration status
+- [DATABASE_SCHEMA.sql](DATABASE_SCHEMA.sql) - Database schema
+
+### Features & Improvements
+- [ARTICLE_UPLOADER_IMPROVEMENTS.md](ARTICLE_UPLOADER_IMPROVEMENTS.md) - Smart uploader features
+- [UPLOADER_QUICK_REFERENCE.md](UPLOADER_QUICK_REFERENCE.md) - Uploader quick reference
+- [UPLOADER_VISUAL_GUIDE.md](UPLOADER_VISUAL_GUIDE.md) - Visual guide for uploaders
+
+### Testing & Verification
+- [TESTING_GUIDE.md](TESTING_GUIDE.md) - Comprehensive testing procedures
 
 ## 🤝 Contributing
 

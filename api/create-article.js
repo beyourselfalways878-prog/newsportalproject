@@ -1,4 +1,15 @@
-import { createClient } from '@supabase/supabase-js';
+import { getOne, create, update, COLLECTIONS } from './_appwrite.js';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+function verifyToken(token) {
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch (error) {
+    return null;
+  }
+}
 
 export default async function handler(req, res) {
   try {
@@ -10,25 +21,17 @@ export default async function handler(req, res) {
     }
     const token = authHeader.split(' ')[1];
 
-    const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !serviceKey) return res.status(500).json({ error: 'Missing server-side Supabase credentials (service role key not set)' });
-
-    // Use a verifier client to get user without mutating admin auth state
-    const verifier = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-    const { data: userData, error: userErr } = await verifier.auth.getUser(token);
-    if (userErr || !userData?.user) {
+    const decoded = verifyToken(token);
+    if (!decoded) {
       return res.status(401).json({ error: 'Invalid token' });
     }
-    const user = userData.user;
+    const userId = decoded.userId;
 
-    // Create fresh admin client for DB writes
-    const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    // Check user role
+    const user = await getOne(COLLECTIONS.USERS, userId);
+    if (!user) return res.status(401).json({ error: 'User not found' });
 
-    // Check profile role
-    const { data: profileRow, error: profileErr } = await admin.from('profiles').select('role').eq('id', user.id).maybeSingle();
-    if (profileErr) return res.status(500).json({ error: 'Profile lookup failed' });
-    const role = (profileRow?.role || '').toLowerCase();
+    const role = (user.role || '').toLowerCase();
     if (!(role === 'admin' || role === 'superuser')) {
       return res.status(403).json({ error: 'Insufficient privileges' });
     }
@@ -37,27 +40,37 @@ export default async function handler(req, res) {
     // Basic validation
     if (!payload.title_hi || !payload.content_hi) return res.status(400).json({ error: 'Missing required fields' });
 
-    // If id present, upsert (update), else insert
-    const toUpsert = {
-      ...payload,
-      updated_at: new Date().toISOString(),
+    const now = new Date().toISOString();
+    let result;
+
+    const articleData = {
+      title_hi: payload.title_hi,
+      excerpt_hi: payload.excerpt_hi || '',
+      content_hi: payload.content_hi,
+      category: payload.category || 'indian',
+      author: payload.author || 'Edited by Twinkle Tiwari',
+      location: payload.location || '',
+      is_breaking: payload.is_breaking || false,
+      is_featured: payload.is_featured || false,
+      image_alt_text_hi: payload.image_alt_text_hi || '',
+      seo_title_hi: payload.seo_title_hi || '',
+      seo_keywords_hi: payload.seo_keywords_hi || '',
+      video_url: payload.video_url || '',
+      image_url: payload.image_url || '',
+      views: payload.views || 0,
+      updated_at: now,
     };
 
-    const { data: insertData, error: insertErr } = await admin.from('articles').upsert([toUpsert]).select().single();
-    if (insertErr) {
-      // Log the failed server attempt
-      try {
-        await admin.from('admin_fallbacks').insert([{ user_id: user.id, event_type: 'article_upsert', details: { payload: toUpsert, error: insertErr } }]);
-      } catch (logErr) { console.warn('Failed to log admin fallback:', logErr); }
-      return res.status(500).json({ error: insertErr.message || insertErr });
+    if (payload.id) {
+      // Update existing article
+      result = await update(COLLECTIONS.ARTICLES, payload.id, articleData);
+    } else {
+      // Insert new article
+      articleData.published_at = now;
+      result = await create(COLLECTIONS.ARTICLES, articleData);
     }
 
-    // Log successful admin insert/upsert
-    try {
-      await admin.from('admin_fallbacks').insert([{ user_id: user.id, event_type: 'article_upsert', details: { article_id: insertData.id, method: 'service' } }]);
-    } catch (logErr) { console.warn('Failed to log admin fallback:', logErr); }
-
-    return res.status(200).json({ ok: true, data: insertData });
+    return res.status(200).json({ ok: true, data: result });
 
   } catch (err) {
     console.error('create-article error:', err);

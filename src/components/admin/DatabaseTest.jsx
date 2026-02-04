@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '@/lib/customSupabaseClient';
-import { useAuth } from '@/contexts/SupabaseAuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
@@ -9,7 +8,7 @@ import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 const DatabaseTest = () => {
   const [isTesting, setIsTesting] = useState(false);
   const [testResults, setTestResults] = useState(null);
-  const { profile } = useAuth();
+  const { profile, token } = useAuth();
   const { toast } = useToast();
 
   const testDatabaseConnection = async () => {
@@ -25,8 +24,7 @@ const DatabaseTest = () => {
 
     try {
       // Test 1: Authentication
-      const { data: sessionData } = await supabase.auth.getSession();
-      results.auth = !!sessionData?.session;
+      results.auth = !!token;
       console.log('Auth test:', results.auth);
 
       // Test 2: Role check
@@ -50,18 +48,23 @@ const DatabaseTest = () => {
           updated_at: new Date().toISOString()
         };
 
-        const { data, error } = await supabase
-          .from('articles')
-          .insert(mockArticle)
-          .select()
-          .single();
+        const response = await fetch('/api/create-article', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(mockArticle),
+        });
 
-        if (error) {
+        if (!response.ok) {
+          const error = await response.json();
           results.error = error;
           console.error('Insert error:', error);
         } else {
+          const data = await response.json();
           results.insert = true;
-          results.articleId = data.id;
+          results.articleId = data.data.id;
           console.log('Insert success:', data);
         }
       }
@@ -74,7 +77,6 @@ const DatabaseTest = () => {
     setTestResults(results);
     setIsTesting(false);
 
-    // Show toast based on results
     if (results.insert) {
       toast({
         title: '✅ Database Test Passed',
@@ -83,7 +85,7 @@ const DatabaseTest = () => {
     } else {
       toast({
         title: '❌ Database Test Failed',
-        description: results.error?.message || 'Check console for details',
+        description: results.error?.error || 'Check console for details',
         variant: 'destructive'
       });
     }
@@ -92,15 +94,19 @@ const DatabaseTest = () => {
   const cleanupTestArticle = async () => {
     if (testResults?.articleId) {
       try {
-        await supabase
-          .from('articles')
-          .delete()
-          .eq('title_hi', 'Test Article - Database Connection Test');
-
-        toast({
-          title: '🧹 Test article cleaned up',
-          description: 'Removed test article from database'
+        const response = await fetch(`/api/articles/${testResults.articleId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
         });
+
+        if (response.ok) {
+          toast({
+            title: '🧹 Test article cleaned up',
+            description: 'Removed test article from database'
+          });
+        }
       } catch (error) {
         console.error('Cleanup error:', error);
       }
@@ -155,35 +161,6 @@ const DatabaseTest = () => {
                 <span>Role Check: {testResults.role ? `✅ Passed (${profile?.role})` : `❌ Failed (${profile?.role || 'no role'})`}</span>
               </div>
 
-              {!testResults.role && (
-                <div className="mt-2 p-2 rounded-md bg-yellow-50 border border-yellow-100">
-                  <p className="text-sm">It looks like your user does not have an `admin` or `superuser` role in the database, or your profile row is missing.</p>
-                  <p className="text-sm mt-1">You can create a profile locally with the helper script or ask an existing superuser to run the admin endpoint.</p>
-                  <div className="mt-2 flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const userId = profile?.id || 'YOUR_USER_ID';
-                        const cmd = `node scripts/create_profile.mjs --id=${userId} --role=admin --name="${profile?.full_name || 'Admin User'}"`;
-                        navigator.clipboard?.writeText(cmd);
-                        toast({ title: 'Command copied', description: cmd });
-                      }}
-                    >
-                      Copy create-profile command
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        toast({ title: 'Tip', description: 'If deployed, call POST /api/create-profile with x-create-profile-secret header (server secret must be set).' });
-                      }}
-                    >
-                      How to create server-side
-                    </Button>
-                  </div>
-                </div>
-              )}
-
               <div className="flex items-center gap-2">
                 {testResults.insert ? (
                   <CheckCircle className="h-5 w-5 text-green-500" />
@@ -198,7 +175,7 @@ const DatabaseTest = () => {
               <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-md">
                 <p className="text-sm font-medium text-red-800 dark:text-red-200">Error Details:</p>
                 <p className="text-sm text-red-700 dark:text-red-300 mt-1">
-                  {testResults.error.message || JSON.stringify(testResults.error)}
+                  {testResults.error.error || JSON.stringify(testResults.error)}
                 </p>
               </div>
             )}

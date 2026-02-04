@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '@/lib/customSupabaseClient';
-import { useAuth } from '@/contexts/SupabaseAuthContext.jsx';
+import { useAuth } from '@/contexts/AuthContext.jsx';
 
 const Fallbacks = () => {
   const { profile } = useAuth();
@@ -9,15 +8,16 @@ const Fallbacks = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!profile || !['admin','superuser'].includes(profile.role)) return;
+    if (!profile || !['admin', 'superuser'].includes(profile.role)) return;
     let mounted = true;
     (async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase.from('admin_fallbacks').select('*').order('created_at', { ascending: false }).limit(50);
-        if (error) {
-          setError(error);
+        const response = await fetch('/api/admin-logs');
+        if (!response.ok) {
+          setError(new Error('Failed to fetch logs'));
         } else if (mounted) {
+          const data = await response.json();
           setLogs(data || []);
         }
       } catch (err) {
@@ -29,11 +29,11 @@ const Fallbacks = () => {
     return () => { mounted = false; };
   }, [profile]);
 
-  if (!profile || !['admin','superuser'].includes(profile.role)) return null;
+  if (!profile || !['admin', 'superuser'].includes(profile.role)) return null;
 
   return (
     <div className="space-y-3">
-      <h3 className="text-lg font-medium">Fallback logs</h3>
+      <h3 className="text-lg font-medium">Admin Logs</h3>
       {loading && <p>Loading...</p>}
       {error && <p className="text-danger">Error loading logs: {String(error.message || error)}</p>}
       {!loading && !error && (

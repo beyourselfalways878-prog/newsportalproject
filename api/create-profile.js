@@ -1,4 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
+import { create, update, getOne, COLLECTIONS } from './_appwrite.js';
+import crypto from 'crypto';
+import { Query } from 'node-appwrite';
+
+function hashPassword(password) {
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
 
 export default async function handler(req, res) {
   try {
@@ -9,19 +15,31 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { id, role, full_name } = req.body || {};
+    const { id, role, full_name, email, password } = req.body || {};
     if (!id || !role) return res.status(400).json({ error: 'Missing id or role' });
 
-    const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !serviceKey) return res.status(500).json({ error: 'Missing server-side Supabase credentials (service role key not set)' });
+    const passwordHash = password ? hashPassword(password) : null;
 
-    const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    const userData = {
+      email: email || `user-${id}@example.com`,
+      full_name: full_name || '',
+      role: role,
+      password_hash: passwordHash,
+      created_at: new Date().toISOString(),
+    };
 
-    const { data, error } = await admin.from('profiles').upsert([{ id, role, full_name }]);
-    if (error) return res.status(500).json({ error: error.message || error });
+    let result;
+    try {
+      // Try to get existing user
+      result = await getOne(COLLECTIONS.USERS, id);
+      // Update existing user
+      result = await update(COLLECTIONS.USERS, id, userData);
+    } catch (err) {
+      // Create new user if doesn't exist
+      result = await create(COLLECTIONS.USERS, userData, id);
+    }
 
-    return res.status(200).json({ ok: true, data });
+    return res.status(200).json({ ok: true, data: result });
   } catch (err) {
     console.error('create-profile error:', err);
     return res.status(500).json({ error: err?.message || 'Unknown error' });
