@@ -14,77 +14,44 @@ const CricketScoreWidget = () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch('/api/cric-prepscores-json');
+        const res = await fetch('/api/live-scores'); // New endpoint
         if (!res.ok) throw new Error('Fetch failed');
         const json = await res.json();
+
         if (!mounted) return;
 
-        // Helper: sanitize vendor HTML (strip scripts, inline styles and event handlers)
-        const sanitizeHtml = (raw) => {
+        const matchesData = json.matches || [];
+        setMatches(matchesData);
+
+        // Fetch AI commentary for the first active match if available
+        if (matchesData.length > 0) {
           try {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(raw || '', 'text/html');
-            // remove risky nodes
-            doc.querySelectorAll('script,iframe,form').forEach(n => n.remove());
-            // strip inline styles and event handlers, sanitize hrefs
-            doc.querySelectorAll('*').forEach(el => {
-              [...el.attributes].forEach(attr => {
-                const name = attr.name.toLowerCase();
-                const value = attr.value || '';
-                if (name.startsWith('on')) el.removeAttribute(attr.name);
-                if (name === 'style') el.removeAttribute('style');
-                if (name === 'href' && value.trim().toLowerCase().startsWith('javascript:')) el.removeAttribute('href');
-              });
+            const aiRes = await fetch('/api/ai-commentary', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ matchData: matchesData[0] })
             });
-            // make links safe
-            doc.querySelectorAll('a').forEach(a => { a.setAttribute('target', '_blank'); a.setAttribute('rel', 'noreferrer noopener'); });
-            return doc.body.innerHTML || '';
-          } catch (e) {
-            return '';
+            const aiJson = await aiRes.json();
+            if (aiJson.text) {
+              console.log('AI Commentary:', aiJson.text);
+              // Could store this in state to display in the widget
+            }
+          } catch (ignore) {
+            // Ignore AI errors to keep widget functional
           }
-        };
+        }
 
-        const deriveShort = (name) => {
-          if (!name) return '';
-          const parts = name.replace(/[^A-Za-z0-9 ]+/g, '').split(/\s+/).filter(Boolean);
-          if (parts.length === 1) return parts[0].slice(0, 3).toUpperCase();
-          return parts.map(p => p[0]).slice(0,3).join('').toUpperCase();
-        };
-
-        const enriched = (json.matches || []).map(m => {
-          const cleaned = { ...m };
-          // ensure team objects exist
-          cleaned.team1 = cleaned.team1 || { name: '', score: '' };
-          cleaned.team2 = cleaned.team2 || { name: '', score: '' };
-
-          // extract images from rawHtml if missing
-          try {
-            const imgs = Array.from((cleaned.rawHtml || '').matchAll(/<img[^>]*class=['"]criclogo['"][^>]*src=['"]([^'"]+)['"]/gi)).map(a => a[1]);
-            if (!cleaned.team1.logo && imgs[0]) cleaned.team1.logo = imgs[0];
-            if (!cleaned.team2.logo && imgs[1]) cleaned.team2.logo = imgs[1];
-          } catch (e) {}
-
-          if (!cleaned.team1.short) cleaned.team1.short = deriveShort(cleaned.team1.name);
-          if (!cleaned.team2.short) cleaned.team2.short = deriveShort(cleaned.team2.name);
-
-          // sanitized HTML fallback (safe to insert)
-          cleaned.sanitizedHtml = sanitizeHtml(cleaned.rawHtml || '');
-
-          return cleaned;
-        });
-
-        setMatches(enriched);
       } catch (err) {
-        console.error('Error loading cric JSON:', err);
+        console.error('Error loading cricket scores:', err);
         setError('Unable to load live scores');
         setMatches([]);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
 
     fetchJson();
-    const refresh = setInterval(fetchJson, 10000);
+    const refresh = setInterval(fetchJson, 60000); // Poll every minute
 
     return () => {
       mounted = false;
@@ -98,10 +65,7 @@ const CricketScoreWidget = () => {
     if (!holder || matches.length === 0) return;
 
     let paused = false;
-
-    // Decide horizontal vs vertical based on container dimensions and breakpoint
     const isHorizontal = () => (holder.scrollWidth > holder.clientWidth) && (window.innerWidth >= 640);
-
     const doAdvanceHorizontal = () => {
       const w = holder.clientWidth;
       if ((holder.scrollLeft + w) >= holder.scrollWidth - 2) {
@@ -111,13 +75,11 @@ const CricketScoreWidget = () => {
       }
     };
 
-    // Only auto-advance when horizontal (desktop/tablet); disable on mobile vertical layout
     let interval = null;
     if (isHorizontal()) {
-      interval = setInterval(() => { if (!paused) doAdvanceHorizontal(); }, 5000);
+      interval = setInterval(() => { if (!paused) doAdvanceHorizontal(); }, 8000); // Slower interval
     }
 
-    // Pause on hover (desktop) / touchstart (mobile)
     const onMouseEnter = () => (paused = true);
     const onMouseLeave = () => (paused = false);
     const onTouchStart = () => (paused = true);
@@ -128,7 +90,7 @@ const CricketScoreWidget = () => {
     holder.addEventListener('touchstart', onTouchStart, { passive: true });
     holder.addEventListener('touchend', onTouchEnd);
 
-    // Keyboard navigation for accessibility
+    // Keyboard navigation
     holder.tabIndex = 0;
     const onKey = (e) => {
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
@@ -140,29 +102,17 @@ const CricketScoreWidget = () => {
         if (isHorizontal()) holder.scrollLeft = Math.max(0, holder.scrollLeft - holder.clientWidth); else holder.scrollTop = Math.max(0, holder.scrollTop - (holder.clientHeight || 200));
       }
     };
-
     holder.addEventListener('keydown', onKey);
-
-    const ro = new ResizeObserver(() => {
-      // Keep first card in view when resized
-      if (isHorizontal()) {
-        holder.scrollLeft = Math.floor(holder.scrollLeft / Math.max(1, holder.clientWidth)) * holder.clientWidth;
-      } else {
-        holder.scrollTop = Math.floor(holder.scrollTop / Math.max(1, holder.clientHeight || 200)) * (holder.clientHeight || 200);
-      }
-    });
-    ro.observe(holder);
 
     return () => {
       if (interval) clearInterval(interval);
-      try { ro.disconnect(); } catch (e) {}
       try {
         holder.removeEventListener('mouseenter', onMouseEnter);
         holder.removeEventListener('mouseleave', onMouseLeave);
         holder.removeEventListener('touchstart', onTouchStart);
         holder.removeEventListener('touchend', onTouchEnd);
         holder.removeEventListener('keydown', onKey);
-      } catch (e) {}
+      } catch (e) { }
     };
   }, [matches]);
 
@@ -198,8 +148,8 @@ const CricketScoreWidget = () => {
 
   return (
     <div className="w-full sm:w-[300px] sm:h-[300px]">
-      <div ref={holderRef} className="slideholder sm:overflow-x-auto overflow-y-auto sm:snap-x snap-mandatory rounded-xl border border-slate-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-800" style={{height: '100%', WebkitOverflowScrolling: 'touch'}}>
-        <div className="flex sm:flex-row flex-col" style={{gap: 12}}>
+      <div ref={holderRef} className="slideholder sm:overflow-x-auto overflow-y-auto sm:snap-x snap-mandatory rounded-xl border border-slate-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-800" style={{ height: '100%', WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex sm:flex-row flex-col" style={{ gap: 12 }}>
           {matches.map((m) => (
             <div
               key={m.id}
@@ -254,7 +204,7 @@ const CricketScoreWidget = () => {
 
                   {/* Safe vendor fallback HTML (sanitized) - hidden on very small screens */}
                   {m.sanitizedHtml ? (
-                    <div className="raw-html-fallback mt-2 text-xs text-slate-500 hidden sm:block" style={{maxHeight: 64, overflow: 'auto'}} dangerouslySetInnerHTML={{ __html: m.sanitizedHtml }} />
+                    <div className="raw-html-fallback mt-2 text-xs text-slate-500 hidden sm:block" style={{ maxHeight: 64, overflow: 'auto' }} dangerouslySetInnerHTML={{ __html: m.sanitizedHtml }} />
                   ) : null}
                 </div>
               </div>

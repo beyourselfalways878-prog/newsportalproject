@@ -44,17 +44,35 @@ const LatestNewsTicker = () => {
   if (!headlines.length) return null;
 
   return (
-    <div className="bg-red-600 text-white py-2 px-4 overflow-hidden">
-      <div className="flex items-center gap-4">
-        <span className="font-bold whitespace-nowrap">LATEST:</span>
-        <div className="flex gap-8 animate-scroll">
-          {headlines.map((h) => (
-            <Link key={h.id} to={`/article/${h.id}`} className="whitespace-nowrap hover:underline">
-              {h.title}
-            </Link>
-          ))}
+    <div className="bg-blue-600 text-white py-2 overflow-hidden relative">
+      <div className="flex items-center">
+        <span className="font-bold whitespace-nowrap bg-blue-700 px-4 py-1 z-10">ताज़ा ख़बरें</span>
+        <div className="flex-1 overflow-hidden ml-2">
+          <div
+            className="flex gap-12 whitespace-nowrap"
+            style={{
+              animation: 'ticker-scroll 30s linear infinite',
+            }}
+          >
+            {/* Duplicate headlines for seamless loop */}
+            {[...headlines, ...headlines].map((h, idx) => (
+              <Link
+                key={`${h.id}-${idx}`}
+                to={`/article/${h.id}`}
+                className="hover:underline flex-shrink-0"
+              >
+                • {h.title}
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
+      <style>{`
+        @keyframes ticker-scroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+      `}</style>
     </div>
   );
 };

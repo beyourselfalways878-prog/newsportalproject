@@ -98,9 +98,7 @@ const ArticlePage = () => {
     };
   };
 
-  const canEdit =
-    user?.email === 'pushkarraj207@gmail.com' ||
-    ['admin', 'superuser'].includes(profile?.role);
+  const canEdit = ['admin', 'superuser', 'editor'].includes(profile?.role);
 
   return (
     <>

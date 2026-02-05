@@ -20,6 +20,17 @@ app.use((req, res, next) => {
     next();
 });
 
+// Caching middleware for API responses
+app.use('/api', (req, res, next) => {
+    // Only cache GET requests
+    if (req.method === 'GET') {
+        // 5 minutes cache for articles, 1 minute for other endpoints
+        const maxAge = req.url.includes('/articles') ? 300 : 60;
+        res.set('Cache-Control', `public, max-age=${maxAge}, stale-while-revalidate=60`);
+    }
+    next();
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({

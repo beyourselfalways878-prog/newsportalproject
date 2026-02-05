@@ -17,7 +17,7 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 
 const CategoryPage = () => {
   const { categoryKey } = useParams();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const language = 'hi';
@@ -232,7 +232,8 @@ const CategoryPage = () => {
   };
 
   const handleUploadClick = () => {
-    if (user?.role === 'admin') {
+    const isAdmin = profile?.role === 'admin' || profile?.role === 'editor';
+    if (isAdmin) {
       setIsUploaderOpen(true);
     } else {
       toast({
@@ -332,7 +333,7 @@ const CategoryPage = () => {
   const pageTitle = `${categoryName} | ${currentContent.siteName}`;
   const pageDescription = `${categoryName} की ताज़ा ख़बरें और अपडेट्स।`;
   const canonicalUrl = `${baseUrl}/category/${categoryKey}`;
-  const canUpload = user?.role === 'admin';
+  const canUpload = profile?.role === 'admin' || profile?.role === 'editor';
 
   return (
     <>

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext.jsx';
 import ProtectedRoute from '@/components/admin/ProtectedRoute.jsx';
+import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { Loader2 } from 'lucide-react';
 
 const HomePage = lazy(() => import('@/pages/HomePage.jsx'));
@@ -11,6 +12,7 @@ const ArticlePage = lazy(() => import('@/pages/ArticlePage.jsx'));
 const DashboardPage = lazy(() => import('@/pages/DashboardPage.jsx'));
 const ArticleUploaderPage = lazy(() => import('@/pages/ArticleUploaderPage.jsx'));
 const MatchDetailPage = lazy(() => import('@/pages/MatchDetailPage.jsx'));
+const NotFoundPage = lazy(() => import('@/pages/NotFoundPage.jsx'));
 
 const PageFallback = () => (
   <div className="flex justify-center items-center min-h-[60vh]">
@@ -20,37 +22,41 @@ const PageFallback = () => (
 
 const App = () => {
   return (
-    <AuthProvider>
-      <Router>
-        <div className="min-h-screen transition-colors duration-500 font-hindi">
-          <Suspense fallback={<PageFallback />}>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/category/:categoryKey" element={<CategoryPage />} />
-              <Route path="/article/:id" element={<ArticlePage />} />
-              <Route path="/match/:matchId" element={<MatchDetailPage />} />
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute allowedRoles={['admin', 'superuser']}>
-                    <DashboardPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/article-uploader"
-                element={
-                  <ProtectedRoute allowedRoles={['admin', 'superuser']}>
-                    <ArticleUploaderPage />
-                  </ProtectedRoute>
-                }
-              />
-            </Routes>
-          </Suspense>
-          <Toaster />
-        </div>
-      </Router>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <Router>
+          <div className="min-h-screen transition-colors duration-500 font-hindi">
+            <Suspense fallback={<PageFallback />}>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/category/:categoryKey" element={<CategoryPage />} />
+                <Route path="/article/:id" element={<ArticlePage />} />
+                <Route path="/match/:matchId" element={<MatchDetailPage />} />
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'superuser']}>
+                      <DashboardPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/article-uploader"
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'superuser']}>
+                      <ArticleUploaderPage />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Catch-all 404 route */}
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Suspense>
+            <Toaster />
+          </div>
+        </Router>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 };
 

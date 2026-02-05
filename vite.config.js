@@ -30,7 +30,7 @@ export default defineConfig({
           }
 
           // Large / distinct deps
-          if (id.includes('/@supabase/')) return 'vendor-supabase';
+          if (id.includes('/firebase/')) return 'vendor-firebase';
           if (id.includes('/framer-motion/')) return 'vendor-motion';
           if (id.includes('/@radix-ui/')) return 'vendor-radix';
           if (id.includes('/lucide-react/')) return 'vendor-icons';

@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Sun, Moon, Search, BellDot, User, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 import LatestNewsTicker from '@/components/news/LatestNewsTicker';
+import SearchModal from '@/components/news/SearchModal';
 
 const Header = ({
   currentContent,
@@ -17,9 +18,20 @@ const Header = ({
   const { user, profile, signOut, loading } = useAuth();
   const navigate = useNavigate();
   const { searchPlaceholder, toggleTheme: toggleThemeText, siteName } = currentContent;
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  // Debug logging - commented out to prevent infinite recursion
-  // console.log('Header Debug:', { user: !!user, profile, loading });
+  // Ctrl+K keyboard shortcut for search
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <>
@@ -67,7 +79,6 @@ const Header = ({
                     variant="ghost"
                     size="icon"
                     onClick={async () => {
-                      console.log('Logout button clicked');
                       try {
                         await signOut();
                       } catch (error) {
@@ -123,15 +134,31 @@ const Header = ({
               transition={{ duration: 0.5, delay: 0.2 }}
               className="flex items-center space-x-2 sm:space-x-4"
             >
-              <div className="hidden md:flex items-center space-x-2 bg-white/10 rounded-full px-3 py-1.5 border border-transparent focus-within:border-white/50 transition-colors">
+              {/* Search Button - Opens Modal */}
+              <button
+                onClick={() => setIsSearchOpen(true)}
+                className="hidden md:flex items-center space-x-2 bg-white/10 rounded-full px-3 py-1.5 border border-transparent hover:border-white/50 transition-colors cursor-pointer"
+              >
                 <Search className="h-4 w-4 text-white/70" />
-                <input
-                  type="text"
-                  placeholder={searchPlaceholder}
-                  className="bg-transparent border-none outline-none text-sm placeholder-white/70 w-40 lg:w-56 text-white"
-                  aria-label={searchPlaceholder}
-                />
-              </div>
+                <span className="text-sm text-white/70 w-40 lg:w-56 text-left">
+                  {searchPlaceholder}
+                </span>
+                <kbd className="hidden lg:inline-flex items-center gap-1 rounded bg-white/20 px-1.5 py-0.5 text-xs text-white/80">
+                  Ctrl+K
+                </kbd>
+              </button>
+
+              {/* Mobile Search Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden text-white/90 hover:text-white"
+                onClick={() => setIsSearchOpen(true)}
+                aria-label="खोजें"
+              >
+                <Search className="h-5 w-5" />
+              </Button>
+
               <Button variant="ghost" size="icon" className="relative text-white/90 hover:text-white" aria-label="सूचनाएं">
                 <BellDot className="h-5 w-5 sm:h-6 sm:w-6" />
                 <span className="absolute top-0 right-0 flex h-2 w-2">
@@ -145,6 +172,9 @@ const Header = ({
       </header>
 
       <LatestNewsTicker />
+
+      {/* Search Modal */}
+      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </>
   );
 };

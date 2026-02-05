@@ -310,36 +310,34 @@ const matchDetails = {
   }
 };
 
-// Fetch live matches
+// Fetch live matches from CricketData API
 export const getLiveMatches = async () => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return mockLiveMatches;
-};
-
-// Get match detail
-export const getMatchDetail = async (matchId) => {
-  await new Promise(resolve => setTimeout(resolve, 300));
-  const match = mockLiveMatches.find(m => m.id === matchId);
-  const detail = matchDetails[matchId];
-  
-  if (!match || !detail) {
-    throw new Error('Match not found');
+  try {
+    const res = await fetch('/api/live-scores');
+    if (!res.ok) throw new Error('Failed to fetch live matches');
+    const json = await res.json();
+    return json.matches || [];
+  } catch (error) {
+    console.error('Error fetching live matches:', error);
+    return [];
   }
-  
-  return {
-    ...match,
-    ...detail
-  };
 };
 
-// Generate AI commentary (server-side)
+// Get match detail (simulated for now as we only fetch current matches)
+export const getMatchDetail = async (matchId) => {
+  const matches = await getLiveMatches();
+  const match = matches.find(m => m.id === matchId);
+  if (!match) throw new Error('Match not found');
+  return match;
+};
+
+// Generate AI commentary (server-side via Gemini)
 export const generateAICommentary = async (matchContext) => {
   try {
-    const res = await fetch('/api/openai-generate', {
+    const res = await fetch('/api/ai-commentary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'commentary', payload: matchContext })
+      body: JSON.stringify({ matchData: matchContext })
     });
     const json = await res.json();
     return json.text || 'रोमांचक मुकाबला जारी है! An exciting match in progress!';
@@ -351,34 +349,14 @@ export const generateAICommentary = async (matchContext) => {
 
 // Generate match analysis (server-side)
 export const generateMatchAnalysis = async (matchData) => {
-  try {
-    const res = await fetch('/api/openai-generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'analysis', payload: matchData })
-    });
-    const json = await res.json();
-    return json.text || 'यह एक रोमांचक मैच रहा। This was an exciting match with great performances from both teams.';
-  } catch (error) {
-    console.error('AI analysis fetch error:', error);
-    return 'यह एक रोमांचक मैच रहा। This was an exciting match with great performances from both teams.';
-  }
+  // Re-use commentary endpoint for now
+  return generateAICommentary(matchData);
 };
 
 // Get player insights (server-side)
 export const getPlayerInsights = async (playerName, performance) => {
-  try {
-    const res = await fetch('/api/openai-generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'insights', payload: { playerName, performance } })
-    });
-    const json = await res.json();
-    return json.text || `${playerName} ने शानदार प्रदर्शन किया। Great performance by the player!`;
-  } catch (error) {
-    console.error('AI insights fetch error:', error);
-    return `${playerName} ने शानदार प्रदर्शन किया। Great performance by the player!`;
-  }
+  // Re-use commentary endpoint with specific context
+  return generateAICommentary({ playerName, performance, context: 'player insight' });
 };
 
 export default {

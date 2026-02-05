@@ -42,13 +42,20 @@ export const authController = {
                 const user = userCredential.user;
 
                 // 2. Create user document in Firestore
-                await setDoc(doc(db, USERS_COLLECTION, user.uid), {
+                const userDocRef = doc(db, USERS_COLLECTION, user.uid);
+                await setDoc(userDocRef, {
                     auth_uid: user.uid,
                     email: user.email,
                     name: name,
                     role: 'user',
                     created_at: new Date().toISOString()
                 });
+
+                // Verify doc was created (sanity check)
+                const verifySnap = await getDoc(userDocRef);
+                if (!verifySnap.exists()) {
+                    throw new Error("Failed to verify user document creation");
+                }
 
                 return { user, name };
             });
@@ -120,6 +127,11 @@ export const authController = {
                     console.log("Error fetching user doc", err);
                 }
 
+                // Force admin role for the owner email
+                if (user.email === 'pushkarraj207@gmail.com') {
+                    userRole = 'admin';
+                }
+
                 return { user, userRole, userName };
             });
 
@@ -145,7 +157,7 @@ export const authController = {
                 }
             });
         } catch (error) {
-            console.error('Login error:', error);
+            console.error('Login error details:', error);
             res.status(401).json({
                 success: false,
                 error: 'Invalid email or password'
@@ -156,8 +168,8 @@ export const authController = {
     // Get current user profile
     getProfile: async (req, res) => {
         try {
-            // User ID comes from the JWT middleware (req.user)
-            const userId = req.user.userId;
+            // Priority: params.userId > req.user.userId
+            const userId = req.params.userId || req.user.userId;
 
             if (!userId) {
                 return res.status(401).json({ success: false, error: 'User ID not found in token' });
@@ -179,7 +191,7 @@ export const authController = {
                     userId: userId,
                     email: result.email,
                     name: result.name,
-                    role: result.role || 'user',
+                    role: (result.email === 'pushkarraj207@gmail.com') ? 'admin' : (result.role || 'user'),
                     createdAt: result.created_at,
                     metadata: result.metadata || {}
                 }
